@@ -171,38 +171,47 @@ data. The Device screen states plainly what Marginalia may and may not do.
 
 ## 5b. Connect your Zotero library
 
-Marginalia reads your Zotero library through the Zotero Web API. That needs two
-things, and they are not the same kind of thing:
+Marginalia reads your Zotero library through the Zotero Web API. **You only
+need one thing: an API key.**
 
-| | What it is | Secret? |
-|---|---|---|
-| **Library ID** | a number identifying your library | No |
-| **API key** | a revocable credential you create | **Yes** |
+### Where do I find my library ID?
 
-### Get them
+You don't. Marginalia asks Zotero.
+
+Your library ID is your numeric Zotero user ID, and Zotero will report it when
+asked about a key — so the setup screen has no field for it. If you are curious,
+or you need it for something else, it is shown at
+[zotero.org/settings/keys](https://www.zotero.org/settings/keys) as *"Your
+userID for use in API calls"*. It is a number, not the URL of your profile page.
+
+### Create the key
 
 1. Go to **[zotero.org/settings/keys](https://www.zotero.org/settings/keys)**.
-2. Your **userID for use in API calls** is shown at the top. That is the
-   library ID — a number, not the URL of your profile.
-3. Click **Create new private key**. Give it a name you will recognise
-   (`Marginalia`), and grant the **minimum** it needs:
-   - *Allow library access* — required, this is the metadata sync;
+2. Click **Create new private key**. Name it something you will recognise
+   (`Marginalia`).
+3. Grant the **minimum** it needs:
+   - *Allow library access* — required; this is the metadata sync.
    - *Allow write access* — only if you want to export annotations back to
-     Zotero. You can add it later.
-4. Copy the key. Zotero shows it **once**.
-
-For a **group library**, use the group's numeric ID and select "group" during
-setup — the API paths differ, and a correct ID with the wrong kind produces a
-confusing "not found".
+     Zotero. You can add it later by editing the key.
+4. Copy it. **Zotero shows the key once.**
 
 ### Add it during setup
 
-In the app, **Settings → Zotero → Connect**. Paste the library ID and the key,
-and press Connect. Marginalia verifies the key against Zotero with one minimal
-request, and stores it **only if that succeeds** — a key that does not work
-never reaches your disk.
+In the app: **Zotero → Connect**, paste the key, press Connect.
 
-Where it is stored:
+Marginalia asks Zotero what the key is, and:
+
+| What it finds | What happens |
+|---|---|
+| One library | Connects straight away. Nothing else to answer. |
+| Several (personal + groups) | Shows the list so you choose. **Nothing is stored until you do** — otherwise you would end up configured against a library you never picked. |
+| A key with no library access | Says so, and points at the permission checkbox you probably missed. |
+| A key Zotero rejects | Says so. **The key never reaches your disk.** If you already had a working key, it is untouched. |
+
+Verification always happens **before** storage. A key that does not work is
+never saved, so setup cannot appear to succeed while nothing works.
+
+Where the key is stored once accepted:
 
 | Platform | Location |
 |---|---|
@@ -210,9 +219,9 @@ Where it is stored:
 | Linux / macOS | the same, until the OS-keychain integration lands |
 | Windows | the app's data directory, protected by its ACL |
 
-To disconnect: **Settings → Zotero → Disconnect**. That deletes Marginalia's
-copy. It does **not** revoke the key at Zotero — only you can do that, from the
-same settings page where you created it.
+To disconnect: **Zotero → Disconnect**. That deletes Marginalia's copy. It does
+**not** revoke the key at Zotero — only you can do that, from the same settings
+page where you created it.
 
 ### Running the live tests against your library
 
@@ -221,11 +230,22 @@ API, supply the credentials through your environment:
 
 ```bash
 export MARGINALIA_ZOTERO_API_KEY=your-key-here
-export MARGINALIA_ZOTERO_LIBRARY_ID=1234567
 cargo test -p marginalia-zotero --features http -- --ignored --nocapture
 ```
 
-Without those variables the live tests skip and report why.
+That is enough — the key-only tests discover the library themselves. One test
+prints exactly what your key can reach:
+
+```
+user ID   : 1234567
+username  : Some("youcef")
+personal  : Some(LibraryAccess { read: true, write: false, notes: true, files: true })
+groups    : []
+all groups: false
+```
+
+`MARGINALIA_ZOTERO_LIBRARY_ID` is optional, and only exercises the older
+explicit-library path. Without any variables the live tests skip and say why.
 
 ### Keeping the key safe
 

@@ -6,9 +6,11 @@
 //!
 //! ```bash
 //! export MARGINALIA_ZOTERO_API_KEY=your-new-key
-//! export MARGINALIA_ZOTERO_LIBRARY_ID=1234567
 //! cargo test -p marginalia-zotero --features http -- --ignored --nocapture
 //! ```
+//!
+//! `MARGINALIA_ZOTERO_LIBRARY_ID` is optional: the key-only test discovers the
+//! library from the key. Set it only to exercise the explicit-library path.
 //!
 //! # Why the key is not in this file
 //!
@@ -55,6 +57,84 @@ macro_rules! require_credentials {
             }
         }
     };
+}
+
+/// The flow a user actually goes through: paste a key, and nothing else.
+#[test]
+#[ignore = "live: needs MARGINALIA_ZOTERO_API_KEY"]
+fn a_key_alone_discovers_the_library() {
+    let key = match EnvCredentialStore::new().load(CredentialKey::ZoteroApiKey) {
+        Ok(Some(k)) => k.expose_secret().clone(),
+        _ => {
+            eprintln!("skipping: set MARGINALIA_ZOTERO_API_KEY");
+            return;
+        }
+    };
+
+    let client = HttpZoteroClient::new();
+    let store = InMemoryCredentialStore::new();
+
+    match SetupService::new(&client, &store).connect_with_key(key) {
+        SetupOutcome::Connected {
+            library,
+            username,
+            can_export,
+        } => {
+            println!(
+                "connected to {library} (account: {}) — export available: {can_export}",
+                username.as_deref().unwrap_or("unknown")
+            );
+            assert!(store.load(CredentialKey::ZoteroApiKey).unwrap().is_some());
+        }
+        SetupOutcome::ChooseLibrary {
+            options,
+            may_have_more_groups,
+            ..
+        } => {
+            // Not a failure: this key reaches several libraries, so the UI
+            // would ask. Print what it would offer.
+            println!("would offer a choice of {} libraries:", options.len());
+            for o in &options {
+                println!("  {o}");
+            }
+            if may_have_more_groups {
+                println!("  (plus groups Zotero did not name)");
+            }
+            assert!(
+                store.is_empty(),
+                "nothing may be stored before the user chooses"
+            );
+        }
+        other => panic!("setup did not succeed: {other:?}"),
+    }
+}
+
+/// Prints what the key can reach, without storing anything.
+#[test]
+#[ignore = "live: needs MARGINALIA_ZOTERO_API_KEY"]
+fn describe_the_key_and_report_its_permissions() {
+    let key = match EnvCredentialStore::new().load(CredentialKey::ZoteroApiKey) {
+        Ok(Some(k)) => k,
+        _ => {
+            eprintln!("skipping: set MARGINALIA_ZOTERO_API_KEY");
+            return;
+        }
+    };
+
+    let description = HttpZoteroClient::new()
+        .describe_key(&key)
+        .expect("describe the key");
+
+    println!("user ID   : {}", description.user_id);
+    println!("username  : {:?}", description.username);
+    println!("personal  : {:?}", description.personal);
+    println!("groups    : {:?}", description.group_ids);
+    println!("all groups: {}", description.all_groups);
+
+    assert!(
+        !description.user_id.is_empty(),
+        "the user ID is the library ID the setup screen no longer has to ask for"
+    );
 }
 
 #[test]

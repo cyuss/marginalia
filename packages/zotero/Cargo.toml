@@ -18,7 +18,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-ureq = { version = "2", optional = true }
+ureq = { version = "2", optional = true, default-features = false, features = ["tls", "json", "gzip"] }
 
 [dev-dependencies]
 marginalia-platform.workspace = true
