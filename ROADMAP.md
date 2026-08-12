@@ -229,7 +229,20 @@ Gated on U1. The first phase that writes anything.
 **Exit:** one document transfers, verifies, and rolls back correctly under every
 simulated fault.
 
-## Phase 4 — Safe local document discovery and compatibility matrix ☐
+## Phase 4 — Safe local document discovery and compatibility matrix ◐
+
+- ☑ `discovery`: a read-only `DeviceReport` — model, raw firmware string,
+      storage, and how many documents are ours versus the user's
+- ☑ ownership classification as a pure function of two sets, defaulting to
+      **theirs** so a classification bug errs towards leaving things alone
+- ☑ divergence reporting: a document the user deleted is reported, never
+      restored
+- ☑ largest-documents view for the storage screen — reporting only, since
+      Marginalia never deletes to make room
+- ☑ unreadable storage is treated exactly like a full device
+- ☐ a real transport to read any of it from (gated on a device)
+
+### Superseded v1 checklist
 
 - ☐ Device detection, identity, firmware parsing
 - ☐ Capability layer + `matrix.toml` loader (empty `tested_at` ⇒ `UNKNOWN`)

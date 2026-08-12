@@ -14,10 +14,12 @@
 
 pub mod capability;
 pub mod compatibility;
+pub mod discovery;
 pub mod provider;
 
 pub use capability::CapabilityResolver;
 pub use compatibility::{CompatibilityMatrix, MatrixEntry};
+pub use discovery::{classify_documents, describe, ClassifiedDocument, DeviceReport, Ownership};
 pub use provider::{
     DeviceIntrospection, DeviceProviderError, RemoteDeviceTransport, RemoteDocument, ValidatedPdf,
 };
