@@ -20,6 +20,7 @@ A complete, step-by-step guide to getting Marginalia running on your machine.
 3. [Get the code](#3-get-the-code)
 4. [Verify the core (no Node needed)](#4-verify-the-core-no-node-needed)
 5. [Run the desktop app](#5-run-the-desktop-app)
+5b. [Connect your Zotero library](#5b-connect-your-zotero-library)
 6. [Build a distributable app](#6-build-a-distributable-app)
 7. [Everyday commands](#7-everyday-commands)
 8. [Project layout](#8-project-layout)
@@ -167,6 +168,77 @@ Device, Activity and Settings — with honest empty states. There is no mock
 data. The Device screen states plainly what Marginalia may and may not do.
 
 ---
+
+## 5b. Connect your Zotero library
+
+Marginalia reads your Zotero library through the Zotero Web API. That needs two
+things, and they are not the same kind of thing:
+
+| | What it is | Secret? |
+|---|---|---|
+| **Library ID** | a number identifying your library | No |
+| **API key** | a revocable credential you create | **Yes** |
+
+### Get them
+
+1. Go to **[zotero.org/settings/keys](https://www.zotero.org/settings/keys)**.
+2. Your **userID for use in API calls** is shown at the top. That is the
+   library ID — a number, not the URL of your profile.
+3. Click **Create new private key**. Give it a name you will recognise
+   (`Marginalia`), and grant the **minimum** it needs:
+   - *Allow library access* — required, this is the metadata sync;
+   - *Allow write access* — only if you want to export annotations back to
+     Zotero. You can add it later.
+4. Copy the key. Zotero shows it **once**.
+
+For a **group library**, use the group's numeric ID and select "group" during
+setup — the API paths differ, and a correct ID with the wrong kind produces a
+confusing "not found".
+
+### Add it during setup
+
+In the app, **Settings → Zotero → Connect**. Paste the library ID and the key,
+and press Connect. Marginalia verifies the key against Zotero with one minimal
+request, and stores it **only if that succeeds** — a key that does not work
+never reaches your disk.
+
+Where it is stored:
+
+| Platform | Location |
+|---|---|
+| reMarkable | one file per secret in Marginalia's own data directory, mode `0600` |
+| Linux / macOS | the same, until the OS-keychain integration lands |
+| Windows | the app's data directory, protected by its ACL |
+
+To disconnect: **Settings → Zotero → Disconnect**. That deletes Marginalia's
+copy. It does **not** revoke the key at Zotero — only you can do that, from the
+same settings page where you created it.
+
+### Running the live tests against your library
+
+The test suite is offline and deterministic by default. To exercise the real
+API, supply the credentials through your environment:
+
+```bash
+export MARGINALIA_ZOTERO_API_KEY=your-key-here
+export MARGINALIA_ZOTERO_LIBRARY_ID=1234567
+cargo test -p marginalia-zotero --features http -- --ignored --nocapture
+```
+
+Without those variables the live tests skip and report why.
+
+### Keeping the key safe
+
+- **Never commit it.** Not in a test file, a fixture, a screenshot, or a config
+  file that is tracked. `.gitignore` covers `.env`, `.env.local` and `*.secret`,
+  but the reliable defence is not putting it there in the first place.
+- **A key that has been pasted into a chat, an issue, or a pull request is
+  compromised.** Revoke it and create a new one — revocation is instant and
+  free.
+- Grant the minimum permissions the features you use actually need.
+- Marginalia never logs the key. It is held in a type that renders as
+  `<redacted>` in every format, including debug output, so a careless log line
+  cannot leak it.
 
 ## 6. Build a distributable app
 
