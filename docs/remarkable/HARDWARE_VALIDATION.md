@@ -88,6 +88,37 @@ finding in its notes and grants nothing —
 inspected structurally. Whether the format is stable across releases, and how
 it behaves for EPUB versus PDF, is not established here.
 
+### Reading it back, on the device — 2,624 highlights
+
+An extractor (`packages/annotations`) and a command (`marginalia highlights`)
+were then built against these files and run on the device itself:
+
+```
+26 document(s), 2624 highlight(s)
+```
+
+Page numbers resolve correctly for both `.content` layouts in use on this
+device — 450 documents at `formatVersion` 1, 85 at 2 — and Markdown export
+produced 26 files inside `/home/root/.marginalia/highlights`.
+
+**The first run found 16 documents and reported 10 as unreadable**, each with
+`missing field 'color'`. Those files have no `color` key at all: older
+highlights, made before the colour highlighters existed. The model was too
+strict, not the data. Making the field optional recovered all 10 documents and
+865 further highlights.
+
+This is the entire argument for reporting failures instead of skipping them. A
+silent `continue` would have produced a confident, complete-looking list that
+was missing 38% of the documents and a third of the highlights, and nothing
+would ever have said so.
+
+**Read-only, demonstrated rather than asserted.** The most recently modified
+files in the document store were timestamped 19:40 and 19:41 — before the
+extraction runs at ~19:45 and the export at ~19:50. Those timestamps were
+unchanged afterwards, and unchanged again after 70 seconds of idling. Document
+count and highlight-directory count were identical before and after: 3814 and
+27.
+
 ### Privacy note
 
 Highlight text is the user's reading. Only key *names* and value *shapes* were
