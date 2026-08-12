@@ -307,6 +307,7 @@ mod tests {
             item_type: "journalArticle".into(),
             is_pdf_attachment: false,
             availability: AttachmentAvailability::Unknown,
+            tags: Vec::new(),
         }
     }
 
@@ -317,6 +318,7 @@ mod tests {
             item_type: "attachment".into(),
             is_pdf_attachment: true,
             availability: AttachmentAvailability::AvailableLocal,
+            tags: Vec::new(),
         }
     }
 

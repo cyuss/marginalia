@@ -266,6 +266,19 @@ fn parse_item(value: &serde_json::Value) -> Option<RemoteItem> {
     let is_pdf_attachment = item_type == "attachment"
         && data.get("contentType").and_then(|v| v.as_str()) == Some("application/pdf");
 
+    // Tags ride along on the item, so syncing them costs no extra request.
+    let tags = data
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(|t| t.get("tag").and_then(|v| v.as_str()).map(String::from))
+                .filter(|t| !t.trim().is_empty())
+                .collect()
+        })
+        .unwrap_or_default();
+
     Some(RemoteItem {
         key: marginalia_core::ids::ZoteroKey::from_string(key),
         version,
@@ -275,6 +288,7 @@ fn parse_item(value: &serde_json::Value) -> Option<RemoteItem> {
         // a `stat` elsewhere. The API cannot tell us, and guessing would put a
         // wrong "PDF available" in front of the user.
         availability: marginalia_core::zotero::AttachmentAvailability::Unknown,
+        tags,
     })
 }
 
@@ -521,6 +535,28 @@ mod tests {
         let item = parse_item(&value).unwrap();
         assert_eq!(item.key.as_str(), "NEW00001");
         assert_eq!(item.item_type, "unknown");
+    }
+
+    #[test]
+    fn tags_are_read_off_the_item() {
+        let value = serde_json::json!({
+            "data": {
+                "key": "ABCD1234", "version": 1, "itemType": "journalArticle",
+                "tags": [{ "tag": "AI" }, { "tag": "transformers" }, { "tag": "  " }]
+            }
+        });
+        let item = parse_item(&value).unwrap();
+        assert_eq!(
+            item.tags,
+            vec!["AI", "transformers"],
+            "blank tags are dropped"
+        );
+    }
+
+    #[test]
+    fn an_item_with_no_tags_field_has_none() {
+        let value = serde_json::json!({ "data": { "key": "A", "version": 1 } });
+        assert!(parse_item(&value).unwrap().tags.is_empty());
     }
 
     #[test]

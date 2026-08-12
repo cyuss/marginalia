@@ -11,6 +11,7 @@
 //! variant capable of moving a file. A sync can record that an attachment
 //! exists; it cannot fetch one. See `marginalia_core::sync`.
 
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use marginalia_core::ids::ZoteroKey;
@@ -43,10 +44,21 @@ impl SyncCursor {
         self.last_version == 0
     }
 
-    /// The query for the next request.
+    /// The query for the next page of items.
     pub fn query(&self, start: u32, limit: u32) -> String {
         format!(
             "{}/items?since={}&start={}&limit={}",
+            self.library.base_path(),
+            self.last_version,
+            start,
+            limit
+        )
+    }
+
+    /// The query for the next page of collections.
+    pub fn collections_query(&self, start: u32, limit: u32) -> String {
+        format!(
+            "{}/collections?since={}&start={}&limit={}",
             self.library.base_path(),
             self.last_version,
             start,
@@ -68,6 +80,9 @@ pub struct RemoteItem {
     /// Whether the file is present on this machine. `Unknown` until resolved
     /// locally, which is a `stat`, not a download.
     pub availability: AttachmentAvailability,
+    /// Zotero tags carried on the item itself, so syncing them costs no extra
+    /// request.
+    pub tags: Vec<String>,
 }
 
 /// One page of results, plus what Zotero said about the rest.
@@ -84,6 +99,30 @@ pub struct ItemPage {
 }
 
 impl ItemPage {
+    pub fn is_last(&self) -> bool {
+        self.next_start.is_none()
+    }
+}
+
+/// One collection as Zotero reported it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteCollection {
+    pub key: ZoteroKey,
+    pub version: i64,
+    pub name: String,
+    /// `None` for a top-level collection.
+    pub parent_key: Option<ZoteroKey>,
+}
+
+/// One page of collections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionPage {
+    pub collections: Vec<RemoteCollection>,
+    pub library_version: i64,
+    pub next_start: Option<u32>,
+}
+
+impl CollectionPage {
     pub fn is_last(&self) -> bool {
         self.next_start.is_none()
     }
@@ -109,10 +148,24 @@ impl SyncPlanner {
     pub fn plan_page(&self, page: &ItemPage) -> SyncPlan {
         let mut ops = Vec::with_capacity(page.items.len() * 2);
 
+        // Tags repeat constantly across a page -- one paper's five tags are
+        // usually four other papers' tags too. Deduplicating here keeps the
+        // transaction small; the upsert is idempotent either way.
+        let mut seen_tags: BTreeSet<&str> = BTreeSet::new();
+
         for item in &page.items {
             ops.push(MetadataOperation::UpsertZoteroItem {
                 key: item.key.clone(),
             });
+
+            for tag in &item.tags {
+                if seen_tags.insert(tag.as_str()) {
+                    ops.push(MetadataOperation::UpsertTag {
+                        namespace: "ZOTERO".to_string(),
+                        name: tag.clone(),
+                    });
+                }
+            }
 
             // Availability is recorded for every attachment, including the
             // ones we could fetch. Knowing a PDF exists is a fact about the
@@ -126,6 +179,33 @@ impl SyncPlanner {
         }
 
         SyncPlan::new(SyncJobKind::ZoteroMetadata, ops)
+    }
+
+    /// Plan the writes for one page of collections.
+    ///
+    /// Hierarchy is preserved as a parent key rather than resolved here: the
+    /// parent may arrive on a later page, and guessing at a missing one would
+    /// silently reparent a user's collection.
+    pub fn plan_collections(&self, page: &CollectionPage) -> SyncPlan {
+        let ops = page
+            .collections
+            .iter()
+            .map(|c| MetadataOperation::UpsertZoteroCollection { key: c.key.clone() })
+            .collect();
+
+        SyncPlan::new(SyncJobKind::ZoteroMetadata, ops)
+    }
+
+    /// The watermark to store after a page of collections.
+    pub fn advance_collections(
+        &self,
+        cursor: &SyncCursor,
+        page: &CollectionPage,
+    ) -> Option<SyncCursor> {
+        page.is_last().then(|| SyncCursor {
+            library: cursor.library.clone(),
+            last_version: page.library_version,
+        })
     }
 
     /// Plan the writes for a set of remote deletions.
@@ -230,6 +310,8 @@ pub struct SyncTally {
     pub pages: u32,
     pub items_seen: u32,
     pub attachments_seen: u32,
+    pub collections_seen: u32,
+    pub tags_seen: u32,
     pub deletions: u32,
     pub pdfs_transferred: u32,
 }
@@ -239,6 +321,17 @@ impl SyncTally {
         self.pages += 1;
         self.items_seen += page.items.len() as u32;
         self.attachments_seen += page.items.iter().filter(|i| i.is_pdf_attachment).count() as u32;
+        self.tags_seen += page
+            .items
+            .iter()
+            .flat_map(|i| i.tags.iter())
+            .collect::<BTreeSet<_>>()
+            .len() as u32;
+    }
+
+    pub fn record_collection_page(&mut self, page: &CollectionPage) {
+        self.pages += 1;
+        self.collections_seen += page.collections.len() as u32;
     }
 
     pub fn record_deletions(&mut self, deleted: &DeletedKeys) {
@@ -261,6 +354,14 @@ mod tests {
             item_type: "journalArticle".into(),
             is_pdf_attachment: false,
             availability: AttachmentAvailability::Unknown,
+            tags: Vec::new(),
+        }
+    }
+
+    fn tagged(k: &str, tags: &[&str]) -> RemoteItem {
+        RemoteItem {
+            tags: tags.iter().map(|t| t.to_string()).collect(),
+            ..item(k, 1)
         }
     }
 
@@ -271,6 +372,28 @@ mod tests {
             item_type: "attachment".into(),
             is_pdf_attachment: true,
             availability,
+            tags: Vec::new(),
+        }
+    }
+
+    fn collection_page(
+        collections: Vec<RemoteCollection>,
+        version: i64,
+        next: Option<u32>,
+    ) -> CollectionPage {
+        CollectionPage {
+            collections,
+            library_version: version,
+            next_start: next,
+        }
+    }
+
+    fn collection(k: &str, name: &str, parent: Option<&str>) -> RemoteCollection {
+        RemoteCollection {
+            key: key(k),
+            version: 1,
+            name: name.into(),
+            parent_key: parent.map(key),
         }
     }
 
@@ -326,6 +449,103 @@ mod tests {
             plan.operations.len(),
             3,
             "two upserts plus one availability"
+        );
+    }
+
+    // ── tags and collections ────────────────────────────────────────────
+
+    #[test]
+    fn tags_ride_along_with_items_and_are_deduplicated() {
+        // One paper's five tags are usually four other papers' tags too.
+        let plan = SyncPlanner::new().plan_page(&page(
+            vec![
+                tagged("A", &["AI", "transformers"]),
+                tagged("B", &["AI", "attention"]),
+            ],
+            10,
+            None,
+        ));
+
+        let tags: Vec<&str> = plan
+            .operations
+            .iter()
+            .filter_map(|op| match op {
+                MetadataOperation::UpsertTag { name, .. } => Some(name.as_str()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(tags, vec!["AI", "transformers", "attention"]);
+    }
+
+    #[test]
+    fn tags_cost_no_extra_request() {
+        // They arrive on the item payload, so a page of items is a page of
+        // tags too. This is why plan_page handles them at all.
+        let mut tally = SyncTally::default();
+        tally.record_page(&page(
+            vec![tagged("A", &["AI"]), tagged("B", &["AI", "RAG"])],
+            10,
+            None,
+        ));
+        assert_eq!(tally.pages, 1);
+        assert_eq!(tally.tags_seen, 2, "distinct tags on the page");
+    }
+
+    #[test]
+    fn a_collection_page_plans_upserts_and_transfers_nothing() {
+        let plan = SyncPlanner::new().plan_collections(&collection_page(
+            vec![
+                collection("COLL1", "AI", None),
+                collection("COLL2", "Transformers", Some("COLL1")),
+            ],
+            10,
+            None,
+        ));
+
+        assert_eq!(plan.operations.len(), 2);
+        assert_eq!(plan.pdf_transfer_count(), 0);
+    }
+
+    #[test]
+    fn a_child_whose_parent_has_not_arrived_yet_is_still_planned() {
+        // The parent may be on a later page. Guessing at a missing one would
+        // silently reparent a user's collection.
+        let plan = SyncPlanner::new().plan_collections(&collection_page(
+            vec![collection("CHILD", "Transformers", Some("NOT_YET_SEEN"))],
+            10,
+            None,
+        ));
+        assert_eq!(plan.operations.len(), 1);
+    }
+
+    #[test]
+    fn collections_use_their_own_endpoint() {
+        let cursor = SyncCursor {
+            library: LibraryRef::user("12345"),
+            last_version: 800,
+        };
+        assert_eq!(
+            cursor.collections_query(0, 100),
+            "/users/12345/collections?since=800&start=0&limit=100"
+        );
+    }
+
+    #[test]
+    fn a_collection_page_advances_the_watermark_only_when_last() {
+        let planner = SyncPlanner::new();
+        let cursor = SyncCursor::initial(LibraryRef::user("1"));
+
+        assert_eq!(
+            planner.advance_collections(&cursor, &collection_page(vec![], 900, Some(50))),
+            None
+        );
+        assert_eq!(
+            planner
+                .advance_collections(&cursor, &collection_page(vec![], 900, None))
+                .unwrap()
+                .last_version,
+            900
         );
     }
 

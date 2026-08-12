@@ -173,7 +173,22 @@ impl<'a> MetadataApplier<'a> {
                 counts.tags_upserted += 1;
             }
 
-            MetadataOperation::UpsertZoteroCollection { .. } => {
+            MetadataOperation::UpsertZoteroCollection { key } => {
+                // Name and parent arrive with the full payload pass; what this
+                // establishes is that the collection exists and can be
+                // referred to. The parent is deliberately not resolved here —
+                // it may be on a later page, and guessing would reparent a
+                // user's collection.
+                self.conn.execute(
+                    "INSERT INTO zotero_collection
+                       (id, zotero_key, zotero_version, name, library_id)
+                     VALUES (?1, ?2, 0, '', '')
+                     ON CONFLICT(zotero_key) DO NOTHING",
+                    params![
+                        marginalia_core::ids::ZoteroItemId::new().as_str(),
+                        key.as_str()
+                    ],
+                )?;
                 counts.collections_upserted += 1;
             }
 
@@ -333,6 +348,43 @@ mod tests {
         let good = [MetadataOperation::UpsertZoteroItem { key: key("AAA") }];
         assert!(MetadataApplier::new(&conn).apply(&good).is_ok());
         assert_eq!(item_count(&conn), 1);
+    }
+
+    #[test]
+    fn collections_are_upserted_idempotently() {
+        let conn = open_in_memory().unwrap();
+        let applier = MetadataApplier::new(&conn);
+        let ops = [MetadataOperation::UpsertZoteroCollection { key: key("COLL1") }];
+
+        applier.apply(&ops).unwrap();
+        applier.apply(&ops).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM zotero_collection", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn tags_are_upserted_idempotently() {
+        let conn = open_in_memory().unwrap();
+        let applier = MetadataApplier::new(&conn);
+        let ops = [
+            MetadataOperation::UpsertTag {
+                namespace: "ZOTERO".into(),
+                name: "AI".into(),
+            },
+            MetadataOperation::UpsertTag {
+                namespace: "ZOTERO".into(),
+                name: "AI".into(),
+            },
+        ];
+        applier.apply(&ops).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM tag", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "the same tag twice in one page is one row");
     }
 
     #[test]

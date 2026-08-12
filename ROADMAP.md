@@ -143,7 +143,7 @@ Unblocked by ADR-002. The shape is a headless agent, not a native shell.
 **Exit:** the app runs locally with Wi-Fi and desktop absent; owns and recovers
 its data; uninstalls cleanly; writes no native/system path.
 
-## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐ (nearly done)
+## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐ (blocked only on U16)
 
 Progress so far, all portable and hardware-free:
 
@@ -173,7 +173,11 @@ Progress so far, all portable and hardware-free:
 - ☑ the agent: `zotero connect` / `use` / `disconnect` and `sync`, behind a
       `network` feature (off by default while U16 is open)
 - ☐ collections and tags
-- ☐ collections and tags in the plan
+- ☑ tags, read off the item payload so they cost no extra request, and
+      deduplicated per page
+- ☑ collections, with hierarchy kept as a parent key rather than resolved —
+      a parent may arrive on a later page, and guessing would reparent a
+      user's collection
 - ☐ TLS on the device (U16)
 
 The v1 desktop-side plan below is superseded in target but not in substance:
