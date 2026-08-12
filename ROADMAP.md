@@ -157,7 +157,13 @@ Progress so far, all portable and hardware-free:
 - ☑ `BackoffPolicy`: `Retry-After` wins, exponential with a ceiling otherwise,
       and a permanent failure is never retried
 - ☑ `SyncTally` reporting `pdfs_transferred`, always zero for a metadata sync
-- ☐ wiring the planner to the database and the journal
+- ☑ `MetadataApplier`: a page applies entirely or not at all, and re-applying
+      a page is safe
+- ☑ `SyncStateRepository`: the watermark is a separate write, made last, so a
+      crash between the final page and the final commit costs a re-fetch and
+      never data
+- ☑ migration 0002 `zotero_sync_state`, with a forward-migration test
+- ☐ the journal
 - ☐ collections and tags
 - ☐ the agent exposing `sync` and the Zotero setup command
 - ☐ TLS on the device (U16)

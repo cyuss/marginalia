@@ -147,6 +147,17 @@ slice 8 are now complete. Slice 10 remains gated.
 
 ## 5. Database compatibility
 
+### Schema changes since the baseline
+
+| Version | Migration | Why | Characterization tests updated |
+|---|---|---|---|
+| 1 | `initial` | the Phase 0 baseline | — |
+| 2 | `zotero_sync_state` | Phase 2's incremental sync watermark, kept separate from mirrored Zotero data so a re-mirror cannot clear our cursor and a cursor reset cannot disturb the mirror | `the_schema_surface_is_pinned`, `the_migration_version_is_pinned` — both failed first, then were updated in the same commit as the migration |
+
+A forward-migration test (`an_older_database_migrates_forward_to_the_current_schema`)
+now builds a v1-only database and asserts it reaches the current schema, so a
+released build's data keeps working.
+
 The schema is target-neutral and needs no migration to run on the device. Two
 device-specific concerns:
 

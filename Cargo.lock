@@ -512,6 +512,7 @@ dependencies = [
  "marginalia-database",
  "marginalia-remarkable",
  "marginalia-safety",
+ "rusqlite",
  "toml",
 ]
 

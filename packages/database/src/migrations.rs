@@ -16,11 +16,18 @@ pub struct Migration {
 }
 
 /// Every migration, in order. Append only.
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "initial",
-    sql: include_str!("../migrations/0001_initial.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "initial",
+        sql: include_str!("../migrations/0001_initial.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "zotero_sync_state",
+        sql: include_str!("../migrations/0002_zotero_sync_state.sql"),
+    },
+];
 
 pub fn latest_version() -> u32 {
     MIGRATIONS.last().map(|m| m.version).unwrap_or(0)

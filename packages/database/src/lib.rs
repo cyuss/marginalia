@@ -12,6 +12,7 @@
 
 pub mod migrations;
 pub mod repositories;
+pub mod sync_apply;
 
 use rusqlite::Connection;
 use thiserror::Error;

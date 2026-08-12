@@ -510,9 +510,13 @@ fn the_shipped_matrix_grants_nothing() {
 
 // ── 6. Storage schema surface ───────────────────────────────────────────────
 
-/// The tables Phase 0 created. The standalone reMarkable runtime will reuse
-/// this schema, so a rename during extraction is a data-migration decision, not
-/// a tidy-up.
+/// The tables the schema contains. The standalone reMarkable runtime reuses this
+/// schema, so a rename is a data-migration decision, not a tidy-up.
+///
+/// **Changed once**, deliberately: migration 0002 added `zotero_sync_state` for
+/// the incremental sync watermark (Phase 2). This test failed first, which is
+/// what it is for — the list is updated here in the same commit as the
+/// migration, never loosened to stop it failing.
 #[test]
 fn the_schema_surface_is_pinned() {
     let conn = marginalia_database::open_in_memory().expect("open db");
@@ -547,19 +551,59 @@ fn the_schema_surface_is_pinned() {
             "zotero_collection",
             "zotero_item",
             "zotero_item_collection",
+            "zotero_sync_state",
         ],
         "the schema changed; a rename is a migration, not a rename"
     );
 }
 
+/// **Changed once**: 1 → 2 when `zotero_sync_state` landed.
 #[test]
 fn the_migration_version_is_pinned() {
     let conn = marginalia_database::open_in_memory().expect("open db");
     assert_eq!(
         marginalia_database::migrations::current_version(&conn).unwrap(),
-        1,
+        2,
         "schema version changed; record it in the migration report"
     );
+}
+
+/// Migrations are forward-only and append-only, so every version a released
+/// build could be sitting on must still arrive at the current schema.
+#[test]
+fn an_older_database_migrates_forward_to_the_current_schema() {
+    use marginalia_database::migrations::{apply_all, MIGRATIONS};
+
+    // A database that only ever saw migration 1, as a v0.1 install would be.
+    let conn = rusqlite::Connection::open_in_memory().unwrap();
+    conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+    conn.execute_batch(
+        "CREATE TABLE schema_migrations (
+           version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);",
+    )
+    .unwrap();
+    conn.execute_batch(MIGRATIONS[0].sql).unwrap();
+    conn.execute(
+        "INSERT INTO schema_migrations VALUES (1, 'initial', '2026-01-01T00:00:00Z')",
+        [],
+    )
+    .unwrap();
+
+    apply_all(&conn).expect("an older database must migrate forward");
+
+    assert_eq!(
+        marginalia_database::migrations::current_version(&conn).unwrap(),
+        marginalia_database::migrations::latest_version()
+    );
+    let has_new_table: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type='table' AND name='zotero_sync_state'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(has_new_table, 1);
 }
 
 // ── 7. Intent and grant lifetimes ───────────────────────────────────────────
