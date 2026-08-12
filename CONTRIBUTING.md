@@ -63,6 +63,52 @@ State in the description:
 A new device-write path that is not one of the four whitelisted operations
 requires a change to the Device Write Policy **first**, reviewed on its own.
 
+## Commit messages
+
+Conventional Commits with a gitmoji prefix:
+
+```
+<emoji> <type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+| | Type | For |
+|---|---|---|
+| ✨ | `feat` | a new feature |
+| 🐛 | `fix` | a bug fix |
+| 📚 | `docs` | documentation only |
+| 🎨 | `style` | formatting, no change in meaning |
+| ♻️ | `refactor` | neither fixes a bug nor adds a feature |
+| ⚡️ | `perf` | a performance improvement |
+| 🚨 | `test` | adding or correcting tests |
+| 🔧 | `chore` | build process, tooling, generation |
+| 🚀 | `chore(release)` | deployment or publishing |
+| 🔗 | `chore(deps)` | adding or removing dependencies |
+| 📦️ | `build` | the build itself |
+| 👷 | `ci` | continuous integration |
+| ⚙️ | `config` | configuration files |
+| 🔒️ | `security` | fixing a security issue |
+
+Scopes follow the crate or area: `core`, `safety`, `db`, `zotero`, `agent`,
+`platform`, `remarkable`, `device`, `install`, `adr`, `readme`.
+
+**Write the body for the reader who has to change this later.** The subject says
+what changed; the body should say *why*, and name the failure mode the change
+prevents. A commit that only restates its diff has wasted the one chance it had
+to explain itself.
+
+```
+✨ feat(db): apply a sync plan atomically, with a separate watermark
+
+Applying a page and declaring the library synced are different writes, and the
+cursor moves last. Doing both in one transaction looks tidier and is wrong: it
+makes "we wrote this page" and "we need never fetch it again" the same fact, so
+a crash in between loses data silently.
+```
+
 ## Code style
 
 Strict typing everywhere. Small modules. Explicit domain models. No boolean
