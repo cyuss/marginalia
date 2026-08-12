@@ -130,6 +130,13 @@ fn allowed_internal_deps() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         .copied()
         .chain(["marginalia-simulator"])
         .collect();
+    // The on-device agent composes the portable crates. It is an application,
+    // not a layer, so it may depend on all of them.
+    m.insert(
+        "marginalia-agent",
+        PORTABLE_CRATES.iter().copied().collect(),
+    );
+
     for test_crate in [
         "marginalia-simulator",
         "marginalia-safety-suite",
@@ -376,5 +383,104 @@ fn domain_and_application_crates_do_not_branch_on_the_target_platform() {
                 );
             }
         }
+    }
+}
+
+// ── the device tooling ──────────────────────────────────────────────────────
+
+/// Shell scripts that talk to someone's reMarkable over SSH are exactly where a
+/// careless line does damage, and they are not covered by the Rust rules above.
+///
+/// This is not a security boundary — a determined edit defeats it. It is a
+/// guard against drift: the day someone reaches for `systemctl` to make the
+/// agent start automatically, this fails and the conversation happens in
+/// review rather than on a user's device.
+#[test]
+fn the_device_scripts_contain_no_forbidden_commands() {
+    let tools = workspace_root().join("tools/device");
+    let Ok(entries) = fs::read_dir(&tools) else {
+        return; // the tooling is optional; absence is not a failure
+    };
+
+    // Each of these would mean touching the device's own software.
+    let forbidden = [
+        ("systemctl", "creating or changing a system service"),
+        ("/etc/init.d", "an init script"),
+        ("opkg", "the system package manager"),
+        ("toltec", "a third-party package manager"),
+        ("LD_PRELOAD", "injecting into a running process"),
+        ("xochitl", "the reMarkable's own application"),
+    ];
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_none_or(|e| e != "sh") {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("read script");
+
+        for (line_no, line) in source.lines().enumerate() {
+            let trimmed = line.trim_start();
+            // Comments may name these; explaining what we never do is the point
+            // of half that documentation. So may output lines: `doctor.sh`
+            // prints "never: xochitl, the kernel, ..." precisely to tell the
+            // user what Marginalia does not do. What matters is whether the
+            // script *runs* one of these, not whether it says the word.
+            // `# guard-allow: <reason>` marks a line that names a forbidden
+            // thing in order to check for its *absence* — reset.sh looks for
+            // system services precisely so that finding one stops the script.
+            // The exception has to be written down, which is the point.
+            if trimmed.starts_with('#')
+                || is_output_line(trimmed)
+                || line.contains("# guard-allow:")
+            {
+                continue;
+            }
+            for (marker, why) in &forbidden {
+                assert!(
+                    !line.contains(marker),
+                    "{}:{} uses '{}' ({}) outside a comment.\n  {}\n\
+                     If this is genuinely needed, it is a change to \
+                     docs/safety/DEVICE_WRITE_POLICY.md first.",
+                    path.display(),
+                    line_no + 1,
+                    marker,
+                    why,
+                    trimmed
+                );
+            }
+        }
+    }
+}
+
+/// Whether a line only prints text, rather than running a command.
+fn is_output_line(trimmed: &str) -> bool {
+    const OUTPUT_HELPERS: &[&str] = &[
+        "say", "info", "warn", "ok", "fail", "step", "die", "printf", "echo",
+    ];
+    let first_word = trimmed
+        .split(|c: char| c.is_whitespace() || c == '(')
+        .next()
+        .unwrap_or("");
+    OUTPUT_HELPERS.contains(&first_word)
+}
+
+/// Both the installer and the reset script must call the guard that keeps every
+/// write inside Marginalia's own directory. A script that skips it is a script
+/// that can be pointed at `/`.
+#[test]
+fn the_device_scripts_assert_their_home_is_safe() {
+    let tools = workspace_root().join("tools/device");
+    for script in ["install.sh", "reset.sh", "doctor.sh"] {
+        let path = tools.join(script);
+        if !path.exists() {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("read script");
+        assert!(
+            source.contains("assert_home_is_safe"),
+            "{script} does not call assert_home_is_safe. Without it, a mistyped \
+             MARGINALIA_HOME makes the script dangerous."
+        );
     }
 }

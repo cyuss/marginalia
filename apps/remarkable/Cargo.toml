@@ -1,0 +1,21 @@
+[package]
+name = "marginalia-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The on-device agent. Headless: it owns a directory, a database, and nothing else."
+
+[[bin]]
+name = "marginalia"
+path = "src/main.rs"
+
+[dependencies]
+marginalia-core.workspace = true
+marginalia-safety.workspace = true
+marginalia-database.workspace = true
+marginalia-platform.workspace = true
+marginalia-remarkable.workspace = true
+marginalia-observability.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true

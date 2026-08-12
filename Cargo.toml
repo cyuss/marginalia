@@ -10,6 +10,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "apps/remarkable",
   "packages/core",
   "packages/safety",
   "packages/observability",
