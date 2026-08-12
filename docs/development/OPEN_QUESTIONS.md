@@ -218,8 +218,24 @@ such rather than quietly accepted.
 Which root certificate store is available, whether to bundle one, and how it is
 updated. Blocks Phase 2 (direct HTTPS to the Zotero API from the device).
 
-**Partially answered 2026-08-12.** Building the Zotero HTTP client produced two
-concrete findings:
+**ANSWERED 2026-08-12 — TLS works on armv7, with no system certificate store
+required.**
+
+The agent was cross-compiled for `armv7-unknown-linux-gnueabihf` with the
+`network` feature inside a container, then run under qemu emulation with
+`/etc/ssl/certs` **emptied**. It reached `api.zotero.org`, completed the TLS
+handshake, and received a genuine `401` for a bogus key — exactly what a wrong
+key should produce.
+
+That means the root store is bundled in the binary rather than read from the
+system, so the reMarkable does not need one and we do not have to ship or
+update one separately. The remaining device-specific question is only whether
+the device has outbound network access when we want it, which is a
+configuration question rather than a capability one.
+
+Reproduce with: `just build-device-docker && just verify-device-binary`.
+
+Earlier findings, kept because they explain the shape of the solution:
 
 1. **`ureq`'s TLS chain needs a cross C compiler for armv7**, failing with
    `failed to find tool "arm-linux-gnueabihf-gcc"` — the *same* blocker as
@@ -236,13 +252,17 @@ while this is unresolved.
 
 ## U17 — Cross-compiling the C dependencies
 
-`marginalia-database` (via `libsqlite3-sys`) and the Zotero `http` feature (via
-its TLS stack) both need a cross C toolchain. Not an architecture problem; see
-[ADR-003](../adr/ADR-003-cross-compilation.md).
+**ANSWERED 2026-08-12.** Both `libsqlite3-sys` and the TLS stack cross-compile
+for `armv7-unknown-linux-gnueabihf` inside a container carrying
+`gcc-arm-linux-gnueabihf`. The result is a 3.9 MB ELF 32-bit ARM EABI5 binary
+that runs: under emulation it initialises its database (schema v2, journal
+`delete`, `synchronous = FULL`) and passes its own `doctor`.
 
-Severity raised from low to **medium**: it now blocks two crates rather than
-one, and it is on the critical path for any real device build. The remedy is
-unchanged and well understood — `cross`/Docker, or a host cross-gcc.
+`cross` was tried first and failed on this machine with "could not execute
+`rustup toolchain list`" — a host can have a working cargo without a `rustup`
+binary. `tools/device/build-in-docker.sh` does the same job with one
+`docker run` and needs nothing from the host but Docker, so the installer falls
+back to it automatically.
 
 ---
 
@@ -255,5 +275,5 @@ unchanged and well understood — `cross`/Docker, or a host cross-gcc.
 | U13 | open | high | Phase 1 packaging |
 | U14 | open | medium | Phase 1 budgets |
 | U15 | open | high | Phase 5 |
-| U16 | partially answered | medium | Phase 2 |
-| U17 | open | **medium** | build slice 8; blocks database + TLS |
+| U16 | **answered** — TLS works, roots are bundled | — | — |
+| U17 | **answered** — container build produces a running ARM binary | — | — |

@@ -42,28 +42,41 @@ info "your device's software in any case — see docs/safety/DEVICE_WRITE_POLICY
 # ── 2. build ─────────────────────────────────────────────────────────────────
 step "2 · Building the agent for your device"
 
-if command -v cross >/dev/null 2>&1; then
+# `cross` is the usual answer but it shells out to `rustup`, which a machine can
+# lack while still having a perfectly good cargo. The container path needs only
+# Docker, so it is tried whenever `cross` is unavailable or broken.
+if command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
+  builder="host"
+elif command -v cross >/dev/null 2>&1 && command -v rustup >/dev/null 2>&1; then
   builder="cross"
-elif command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
-  builder="cargo"
 else
-  die "no ARM cross-compiler found" \
-"The reMarkable uses a 32-bit ARM processor, so the agent has to be
-      built for it. The simplest way:
-
-          cargo install cross     (needs Docker)
-
-      Then run this script again. See docs/adr/ADR-003-cross-compilation.md"
+  builder="docker"
 fi
 info "using ${builder}"
 
+case "$builder" in
+  host)   artifact="$REPO_ROOT/target/$TARGET/release/$BINARY" ;;
+  cross)  artifact="$REPO_ROOT/target/$TARGET/release/$BINARY" ;;
+  docker) artifact="$REPO_ROOT/target/device/$TARGET/release/$BINARY" ;;
+esac
+
 if (( DRY_RUN )); then
-  info "would run: ${builder} build --release --target ${TARGET} -p marginalia-agent"
+  info "would build with: ${builder}"
+  info "would produce:    ${artifact}"
   artifact="(not built)"
 else
-  ( cd "$REPO_ROOT" && "$builder" build --release --target "$TARGET" -p marginalia-agent ) \
-    || die "the build failed" "Nothing was sent to your reMarkable."
-  artifact="$REPO_ROOT/target/$TARGET/release/$BINARY"
+  case "$builder" in
+    host)
+      ( cd "$REPO_ROOT" && cargo build --release --target "$TARGET" -p marginalia-agent --features network ) \
+        || die "the build failed" "Nothing was sent to your reMarkable." ;;
+    cross)
+      ( cd "$REPO_ROOT" && cross build --release --target "$TARGET" -p marginalia-agent --features network ) \
+        || die "the build failed" "Nothing was sent to your reMarkable." ;;
+    docker)
+      "$REPO_ROOT/tools/device/build-in-docker.sh" \
+        || die "the build failed" "Nothing was sent to your reMarkable." ;;
+  esac
+
   [[ -f "$artifact" ]] || die "the build produced no binary at $artifact"
   ok "built $(du -h "$artifact" | awk '{print $1}')"
 fi

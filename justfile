@@ -141,6 +141,22 @@ build-device:
     fi
     ls -lh target/{{RM_TARGET}}/release/marginalia
 
+# Build the agent for the reMarkable inside a container. Needs only Docker.
+build-device-docker:
+    ./tools/device/build-in-docker.sh
+
+# Run the built ARM agent under emulation, to check it actually executes.
+verify-device-binary:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    BIN=target/device/{{RM_TARGET}}/release/marginalia
+    [[ -f "$BIN" ]] || { echo "Build it first: just build-device-docker" >&2; exit 1; }
+    file "$BIN"
+    docker run --rm --platform linux/arm/v7 \
+      -v "$PWD/target/device/{{RM_TARGET}}/release":/x:ro \
+      -e MARGINALIA_HOME=/data/.marginalia \
+      debian:bookworm-slim bash -c '/x/marginalia init && /x/marginalia doctor'
+
 # Build the desktop companion for distribution.
 build-desktop:
     pnpm build

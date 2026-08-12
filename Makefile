@@ -26,7 +26,7 @@ AGENT_DEV_HOME := $(HOME)/.marginalia-dev
         dev dev-web agent agent-init \
         check test test-safety test-arch test-characterization test-device-faults \
         test-zotero-live lint fmt fmt-check typecheck \
-        build cross-check build-device build-desktop \
+        build cross-check build-device build-device-docker verify-device-binary build-desktop \
         device device-doctor device-install-dry device-install device-status \
         device-check device-reset-dry device-reset \
         clean docs stats
@@ -148,6 +148,20 @@ build-device:
 	    echo "No ARM cross-compiler. Run: make setup-cross" >&2; exit 1; \
 	fi
 	@ls -lh target/$(RM_TARGET)/release/marginalia
+
+## build-device-docker: build the agent for the reMarkable in a container (needs only Docker)
+build-device-docker:
+	./tools/device/build-in-docker.sh
+
+## verify-device-binary: run the built ARM agent under emulation
+verify-device-binary:
+	@BIN=target/device/$(RM_TARGET)/release/marginalia; \
+	 [ -f "$$BIN" ] || { echo "Build it first: make build-device-docker" >&2; exit 1; }; \
+	 file "$$BIN"; \
+	 docker run --rm --platform linux/arm/v7 \
+	   -v "$(PWD)/target/device/$(RM_TARGET)/release":/x:ro \
+	   -e MARGINALIA_HOME=/data/.marginalia \
+	   debian:bookworm-slim bash -c '/x/marginalia init && /x/marginalia doctor'
 
 ## build-desktop: build the desktop companion for distribution
 build-desktop:

@@ -4,16 +4,19 @@ Connect the device, run three commands, and everything Marginalia does lives on
 the reMarkable itself. Your computer is needed to install it, and never again
 after that.
 
-> ### ⚠ Nothing here has been run against real hardware
+> ### ⚠ Not yet run against real hardware
 >
-> These scripts are written and reviewed, and their guard rails are covered by
-> tests — but **no reMarkable has been touched**. Whether the agent runs on your
-> firmware is [U11 and U13](../development/OPEN_QUESTIONS.md), still open.
+> **What is proven:** the agent cross-compiles for the reMarkable's processor
+> and *runs* — under emulation it starts, creates and migrates its database,
+> passes its own checks, and reaches the real Zotero API over TLS.
 >
-> They cannot damage your device's software: everything they write goes into one
-> directory they create, and [`reset.sh`](#removing-it) removes it. But they may
-> simply not work yet, and you should read `--dry-run` output before believing
-> any of it.
+> **What is not:** no reMarkable has been touched. Whether the agent runs on
+> your firmware, and whether an install survives a firmware update, are
+> [U11 and U13](../development/OPEN_QUESTIONS.md) — still open.
+>
+> The scripts cannot damage your device's software: everything they write goes
+> into one directory they create, and [`reset.sh`](#removing-it) removes it.
+> Read the `--dry-run` output before believing any of it.
 
 ---
 
@@ -40,16 +43,28 @@ directory removes Marginalia completely — which is what
 Copyrights and licenses*. It shows an SSH password. You control this setting and
 can turn it off again afterwards.
 
-**On your machine**, you need Rust and a cross-compiler. The reMarkable uses a
-32-bit ARM processor, so the agent has to be built for it:
+**On your machine**, you need Docker. The reMarkable uses a 32-bit ARM
+processor, so the agent is built for it inside a container:
 
 ```bash
-cargo install cross
+just build-device-docker      # or: make build-device-docker
 ```
 
-That needs Docker. There is an alternative if you already have
-`arm-linux-gnueabihf-gcc`. See
-[ADR-003](../adr/ADR-003-cross-compilation.md).
+That is all — it needs nothing from your Rust setup. If you happen to have
+`arm-linux-gnueabihf-gcc`, the installer uses it directly and skips Docker.
+
+> `cross` is the usual tool for this and works too, but it shells out to
+> `rustup`, and a machine can have a perfectly good `cargo` without a `rustup`
+> binary. The container path avoids that.
+
+You can check the result before going near your device:
+
+```bash
+just verify-device-binary
+```
+
+It runs the ARM binary under emulation and has it initialise a database and
+check itself.
 
 ## Install
 
@@ -92,10 +107,15 @@ You do not need a library ID. Marginalia asks Zotero for it.
 ssh root@10.11.99.1 '/home/root/.marginalia/bin/marginalia status'
 ```
 
-> **Not yet wired.** The setup command that accepts the key on the device is
-> the next piece of work — the logic is written and tested in
-> `packages/zotero`, but the agent does not yet expose it. Today `status` will
-> report *zotero: not connected*.
+On the device:
+
+```bash
+ssh root@10.11.99.1 '/home/root/.marginalia/bin/marginalia zotero connect <your-key>'
+ssh root@10.11.99.1 '/home/root/.marginalia/bin/marginalia sync'
+```
+
+The library ID is discovered from the key. If the key reaches several
+libraries, the agent lists them and stores nothing until you pick one.
 
 ## Where the features appear
 
@@ -208,7 +228,8 @@ quietly do to your device.
 | What you see | What it means |
 |---|---|
 | `cannot reach your reMarkable` | Not connected, off, or developer access not enabled. Check `ssh root@10.11.99.1`. |
-| `no ARM cross-compiler found` | Run `cargo install cross` (needs Docker). |
+| `no ARM cross-compiler found` | Start Docker; the installer builds in a container. |
+| `could not execute rustup toolchain list` | `cross` needs `rustup`, which you may not have. Use `just build-device-docker` instead. |
 | `the copy did not arrive intact` | The transfer was corrupted. The partial file was removed; nothing else changed. Run install again. |
 | `less than 50 MB free` | Marginalia will not fill your device. Free some space. |
 | `MARGINALIA_HOME is inside /usr` | A guard caught a misconfiguration. Unset `MARGINALIA_HOME` and try again. |

@@ -106,7 +106,7 @@ Slices, each independently reversible and green:
 - ☑ 5. `CredentialStore` port + `Redacted` moved into the core ([ADR-004](docs/adr/ADR-004-device-credentials.md)); implementations deferred to the setup flow that needs them
 - ☑ 6. `Clock` port; repositories and migrations use it
 - ☑ 7. cross-compilation CI job for the portable crates
-- ◐ 8. cross-C toolchain so `marginalia-database` builds for ARM (U17) — **needs Docker or `cross`, neither available on the machine where Phase 0.5 ran.** Not wired into CI rather than shipping an unverified step.
+- ☑ 8. cross-C toolchain (U17) — `tools/device/build-in-docker.sh` produces a running ARM binary; verified under emulation
 - ☑ 9. simulator device-side faults: power loss, corruption, truncation, storage pressure, clock skew
 - ⚠ 10. minimal `apps/remarkable` smoke app — **gated on ADR-002**
 
@@ -143,7 +143,7 @@ Unblocked by ADR-002. The shape is a headless agent, not a native shell.
 **Exit:** the app runs locally with Wi-Fi and desktop absent; owns and recovers
 its data; uninstalls cleanly; writes no native/system path.
 
-## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐ (blocked only on U16)
+## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐ (unblocked)
 
 Progress so far, all portable and hardware-free:
 
@@ -178,7 +178,10 @@ Progress so far, all portable and hardware-free:
 - ☑ collections, with hierarchy kept as a parent key rather than resolved —
       a parent may arrive on a later page, and guessing would reparent a
       user's collection
-- ☐ TLS on the device (U16)
+- ☑ TLS on the device (U16) — works on armv7 with roots bundled in the binary,
+      verified against the real Zotero API from an ARM environment with no
+      system certificate store
+- ☐ a real device: install and run there
 
 The v1 desktop-side plan below is superseded in target but not in substance:
 the sync engine, firewall and journal are unchanged; the runtime moves to the
