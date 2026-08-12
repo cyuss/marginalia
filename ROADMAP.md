@@ -12,11 +12,17 @@ Repository model: one pnpm + Cargo monorepo
 
 ## Product decision (v2)
 
-The essential reading workflow must run **on the reMarkable 2 itself**, without
-requiring a Mac/PC, a permanent local process, or a Marginalia server. The RM2
-application owns its local database, search index, cached Zotero metadata,
-downloaded PDFs, annotations, notes, tags, journal and recovery state. Internet
-is needed only for operations that inherently contact Zotero.
+Marginalia is a **reading and annotation workflow for the reMarkable 2**, and it
+must run **on the device itself** — no Mac/PC required, no permanent local
+process, no Marginalia server. The device owns its database, search index,
+cached library metadata, downloaded documents, annotations, notes, tags, journal
+and recovery state.
+
+**Where reading material comes from is a plug-in concern.** A `LibraryProvider`
+supplies source-neutral items; a folder of documents needs no network at all,
+and Zotero is the richest source implemented. The workflow above the port does
+not know which it is reading. Internet is needed only by sources that inherently
+require it.
 
 The desktop application stays in the same monorepo and becomes an **optional
 companion and power mode**. No essential RM2 workflow may depend on it.
@@ -143,7 +149,14 @@ Unblocked by ADR-002. The shape is a headless agent, not a native shell.
 **Exit:** the app runs locally with Wi-Fi and desktop absent; owns and recovers
 its data; uninstalls cleanly; writes no native/system path.
 
-## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐ (unblocked)
+## Phase 2 — Library sources on the device ◐ (unblocked)
+
+- ☑ `LibraryProvider` port and a source-neutral `LibraryItem` in `core`
+- ☑ **folder** provider — no network, no account, works on the device
+- ☑ cross-source identity by strong identifier only, never by title
+- ☐ a `source add` command in the agent, and folder items in the database
+
+### Zotero, the first rich source
 
 Progress so far, all portable and hardware-free:
 
