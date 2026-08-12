@@ -89,6 +89,8 @@ fn main() -> ExitCode {
         "highlights" => match args.get(1).map(String::as_str) {
             None => highlights_cmd::list(),
             Some("--export") => highlights_cmd::export(&home),
+            Some("--save") => highlights_cmd::save(&home),
+            Some("--new") => highlights_cmd::whats_new(&home),
             Some("--document") => match args.get(2) {
                 Some(uuid) => highlights_cmd::one(uuid),
                 None => {
@@ -172,6 +174,8 @@ COMMANDS
     highlights                  every document you have highlighted
     highlights <part of title>   the passages themselves
     highlights --export          write them as Markdown into the agent's home
+    highlights --save            keep them, so 'what is new' has an answer
+    highlights --new             what arrived since the run before last
     highlights --document <uuid> one document, as JSON, for scripting
 
   Highlights are read from the reMarkable's own files. Highlight text in the

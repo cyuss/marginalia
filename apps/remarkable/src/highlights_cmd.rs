@@ -6,6 +6,7 @@
 //! agent's own home directory.
 
 use marginalia_annotations::{extract, extract_one, DocumentHighlights, DEFAULT_STORE};
+use marginalia_database::highlights::{HighlightRecord, HighlightRepository};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -269,6 +270,151 @@ fn safe_filename(name: &str) -> String {
     } else {
         trimmed.chars().take(80).collect()
     }
+}
+
+/// `marginalia highlights --save` — extract, and keep what was found.
+///
+/// Writes to the agent's own database and nothing else. The device's files are
+/// read; your library is not touched.
+pub fn save(home: &Path) -> ExitCode {
+    let store = store_path();
+    let library = match extract(&store) {
+        Ok(library) => library,
+        Err(e) => return unreadable_store(&store, &e.to_string()),
+    };
+
+    let records = to_records(&library);
+
+    let db_path = home.join("marginalia.sqlite");
+    let conn = match marginalia_database::open_with_profile(
+        &db_path.to_string_lossy(),
+        marginalia_database::StorageProfile::Device,
+    ) {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("could not open the database: {e}");
+            eprintln!("nothing was changed. Your documents are unaffected.");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let repo = HighlightRepository::new(&conn);
+    let summary = match repo.record_extraction(
+        &records,
+        marginalia_annotations::EXTRACTION_VERSION,
+        library.unreadable.len(),
+    ) {
+        Ok(summary) => summary,
+        Err(e) => {
+            eprintln!("could not store the highlights: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    // Only safe because `extract` read the whole store. A single-document run
+    // must never call this: everything else would look as though it had gone.
+    let gone = repo.mark_gone(&records).unwrap_or(0);
+
+    println!(
+        "{} highlight(s) across {} document(s)",
+        summary.highlights_seen, summary.documents_seen
+    );
+    if summary.highlights_new > 0 {
+        println!("  {} new since the last run", summary.highlights_new);
+    } else {
+        println!("  nothing new since the last run");
+    }
+    if gone > 0 {
+        println!("  {gone} no longer on the device — kept here anyway");
+    }
+    println!("  {} kept in total", repo.total().unwrap_or(0));
+    println!();
+    println!("  marginalia highlights --new    what arrived since the run before");
+
+    report_unreadable(&library.unreadable);
+    ExitCode::SUCCESS
+}
+
+/// `marginalia highlights --new` — what appeared since the previous run.
+pub fn whats_new(home: &Path) -> ExitCode {
+    let db_path = home.join("marginalia.sqlite");
+    let conn = match marginalia_database::open_with_profile(
+        &db_path.to_string_lossy(),
+        marginalia_database::StorageProfile::Device,
+    ) {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("could not open the database: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let repo = HighlightRepository::new(&conn);
+    let Some(previous) = repo.previous_run_at().unwrap_or(None) else {
+        println!("There has only been one run so far, so there is nothing to compare with.");
+        println!();
+        println!("  marginalia highlights --save    run it again later, then ask");
+        return ExitCode::SUCCESS;
+    };
+
+    match repo.since(&previous) {
+        Ok(rows) if rows.is_empty() => {
+            println!("Nothing new since {previous}.");
+            ExitCode::SUCCESS
+        }
+        Ok(rows) => {
+            println!("{} new highlight(s) since {previous}", rows.len());
+            println!();
+            let mut current = String::new();
+            for row in rows {
+                if row.document_name != current {
+                    println!("{}", row.document_name);
+                    current = row.document_name.clone();
+                }
+                let page = match row.page_number {
+                    Some(n) => format!("page {n}"),
+                    None => "page unknown".to_string(),
+                };
+                println!("  {}", row.text.trim());
+                println!("      — {page}");
+                println!();
+            }
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("could not read them back: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// The extractor's types, flattened into rows the database understands.
+///
+/// This mapping lives here rather than in either crate because the agent is the
+/// only thing that knows both — which is what keeps `marginalia-database` from
+/// having to learn the reMarkable's file formats.
+fn to_records(library: &marginalia_annotations::Library) -> Vec<HighlightRecord> {
+    library
+        .documents
+        .iter()
+        .flat_map(|document| {
+            document.pages.iter().flat_map(move |page| {
+                page.highlights
+                    .iter()
+                    .map(move |highlight| HighlightRecord {
+                        document_uuid: document.uuid.clone(),
+                        document_name: document.name.clone(),
+                        file_type: document.file_type.clone(),
+                        page_id: page.page_id.clone(),
+                        page_number: page.page_number,
+                        start_offset: highlight.start,
+                        length: highlight.length,
+                        text: highlight.text.clone(),
+                        color: highlight.color,
+                    })
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]

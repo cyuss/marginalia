@@ -513,10 +513,17 @@ fn the_shipped_matrix_grants_nothing() {
 /// The tables the schema contains. The standalone reMarkable runtime reuses this
 /// schema, so a rename is a data-migration decision, not a tidy-up.
 ///
-/// **Changed once**, deliberately: migration 0002 added `zotero_sync_state` for
-/// the incremental sync watermark (Phase 2). This test failed first, which is
-/// what it is for — the list is updated here in the same commit as the
+/// **Changed twice**, deliberately, and this test failed first both times —
+/// which is what it is for. The list is updated in the same commit as the
 /// migration, never loosened to stop it failing.
+///
+/// 1. Migration 0002 added `zotero_sync_state` for the incremental sync
+///    watermark (Phase 2).
+/// 2. Migration 0003 added `extraction_run`, rebuilt `highlight` around what a
+///    device actually stores, and removed `side_note` and `sticky_note`. Those
+///    two belonged to the overlay features struck from the roadmap on
+///    2026-08-13: they needed a screen this project has decided never to draw
+///    on. Nothing had ever written to any of the three.
 #[test]
 fn the_schema_surface_is_pinned() {
     let conn = marginalia_database::open_in_memory().expect("open db");
@@ -536,13 +543,12 @@ fn the_schema_surface_is_pinned() {
             "device_capability",
             "document",
             "document_mapping",
+            "extraction_run",
             "highlight",
             "reading_state",
             "safety_log",
             "safety_snapshot",
             "schema_migrations",
-            "side_note",
-            "sticky_note",
             "sync_job",
             "sync_operation",
             "tag",
@@ -557,13 +563,14 @@ fn the_schema_surface_is_pinned() {
     );
 }
 
-/// **Changed once**: 1 → 2 when `zotero_sync_state` landed.
+/// **Changed twice**: 1 → 2 when `zotero_sync_state` landed, 2 → 3 when
+/// highlights were reshaped around the device and given a run log.
 #[test]
 fn the_migration_version_is_pinned() {
     let conn = marginalia_database::open_in_memory().expect("open db");
     assert_eq!(
         marginalia_database::migrations::current_version(&conn).unwrap(),
-        2,
+        3,
         "schema version changed; record it in the migration report"
     );
 }

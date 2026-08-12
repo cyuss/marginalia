@@ -27,6 +27,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "zotero_sync_state",
         sql: include_str!("../migrations/0002_zotero_sync_state.sql"),
     },
+    Migration {
+        version: 3,
+        name: "highlights",
+        sql: include_str!("../migrations/0003_highlights.sql"),
+    },
 ];
 
 pub fn latest_version() -> u32 {
