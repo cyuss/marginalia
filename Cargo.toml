@@ -19,6 +19,7 @@ members = [
   "packages/platform",
   "packages/zotero",
   "packages/library-folder",
+  "packages/annotations",
   "packages/sync",
   "tests/remarkable-simulator",
   "tests/safety",
@@ -45,6 +46,7 @@ marginalia-remarkable = { path = "packages/remarkable" }
 marginalia-platform = { path = "packages/platform" }
 marginalia-zotero = { path = "packages/zotero" }
 marginalia-library-folder = { path = "packages/library-folder" }
+marginalia-annotations = { path = "packages/annotations" }
 marginalia-sync = { path = "packages/sync" }
 marginalia-simulator = { path = "tests/remarkable-simulator" }
 

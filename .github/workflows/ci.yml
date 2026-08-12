@@ -99,9 +99,24 @@ jobs:
           # grep -rIn emits "path:line:content", so the filter anchors on that
           # shape to drop hits that are inside a comment. Verified to keep a
           # real code hit and drop a documentation mention.
+          #
+          # `guard-allow:` lines are dropped too, matching the architecture
+          # test in tests/architecture/tests/boundaries.rs. Both guards must
+          # agree, or a line is legal locally and fails in CI. The exception
+          # exists because a read-only extractor has to name the directory it
+          # reads; naming it is not touching it.
+          #
+          # tests/architecture is excluded because that is where the forbidden
+          # words are *defined*. Scanning the rule table for the words it lists
+          # reports the guard as a violation of itself.
+          #
+          # apps/ is included: the agent is the code that actually runs on a
+          # device, so leaving it out was the more serious gap.
           if grep -rInE '\b(xochitl|/usr/bin|systemctl|toltec)\b' \
-               --include='*.rs' packages/ tests/ \
-               | grep -vE '^[^:]+:[0-9]+: *(//|///|//!|#)' ; then
+               --include='*.rs' packages/ apps/ tests/ \
+               --exclude-dir=architecture \
+               | grep -vE '^[^:]+:[0-9]+: *(//|///|//!|#)' \
+               | grep -v 'guard-allow:' ; then
             echo "::error::A reference to prohibited device territory appeared outside a comment."
             exit 1
           fi

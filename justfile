@@ -11,7 +11,7 @@
 set shell := ["bash", "-uc"]
 
 RM_TARGET := "armv7-unknown-linux-gnueabihf"
-PORTABLE  := "-p marginalia-core -p marginalia-safety -p marginalia-observability -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero -p marginalia-library-folder"
+PORTABLE  := "-p marginalia-core -p marginalia-safety -p marginalia-observability -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero -p marginalia-library-folder -p marginalia-annotations"
 
 # List every recipe, grouped.
 default:
@@ -218,6 +218,7 @@ docs:
     @echo "  README.md                                    what this is"
     @echo "  docs/INSTALL.md                              install on your computer"
     @echo "  docs/INSTALL_REMARKABLE.md                   install on your reMarkable"
+    @echo "  docs/USING_MARGINALIA.md                     how to actually use it"
     @echo "  ROADMAP.md                                   what is built and what is next"
     @echo ""
     @echo "  docs/architecture/ARCHITECTURE.md            the design"

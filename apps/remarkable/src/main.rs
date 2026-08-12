@@ -27,6 +27,8 @@ use marginalia_database::StorageProfile;
 use marginalia_platform::FileCredentialStore;
 use marginalia_safety::{FeatureFlag, FeatureFlagManager};
 
+mod highlights_cmd;
+
 #[cfg(feature = "network")]
 mod zotero_cmd;
 
@@ -60,6 +62,23 @@ fn main() -> ExitCode {
         "status" => status(&home),
         "init" => init(&home),
         "doctor" => doctor(&home),
+
+        // Reads the reMarkable's own library. Needs no database, no network and
+        // no permission from the safety manager, because it writes nothing --
+        // except `--export`, which writes into the agent's home and nowhere
+        // else.
+        "highlights" => match args.get(1).map(String::as_str) {
+            None => highlights_cmd::list(),
+            Some("--export") => highlights_cmd::export(&home),
+            Some("--document") => match args.get(2) {
+                Some(uuid) => highlights_cmd::one(uuid),
+                None => {
+                    eprintln!("usage: marginalia highlights --document <uuid>");
+                    ExitCode::from(64)
+                }
+            },
+            Some(query) => highlights_cmd::show(query),
+        },
 
         #[cfg(feature = "network")]
         "sync" => zotero_cmd::sync(&home, marginalia_core::sync::JobTrigger::User),
@@ -129,6 +148,16 @@ COMMANDS
     doctor     check this installation, changing nothing
     version    print the version
     help       this text
+
+  Reading back what you marked
+    highlights                  every document you have highlighted
+    highlights <part of title>   the passages themselves
+    highlights --export          write them as Markdown into the agent's home
+    highlights --document <uuid> one document, as JSON, for scripting
+
+  Highlights are read from the reMarkable's own files. Highlight text in the
+  native reader and it appears here. Nothing in the device's library is
+  modified — this only ever reads it.
 
   Zotero (builds with --features network)
     zotero connect <api-key>    connect a library; the ID is discovered for you

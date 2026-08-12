@@ -481,6 +481,7 @@ name = "marginalia-agent"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "marginalia-annotations",
  "marginalia-core",
  "marginalia-database",
  "marginalia-observability",
@@ -491,6 +492,15 @@ dependencies = [
  "marginalia-zotero",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "marginalia-annotations"
+version = "0.1.0"
+dependencies = [
+ "marginalia-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

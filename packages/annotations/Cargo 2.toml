@@ -1,0 +1,11 @@
+[package]
+name = "marginalia-annotations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Reads highlights the reMarkable already stored. Read-only, no network."
+
+[dependencies]
+marginalia-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true

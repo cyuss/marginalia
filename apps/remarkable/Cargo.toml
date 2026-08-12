@@ -21,6 +21,7 @@ marginalia-safety.workspace = true
 marginalia-database.workspace = true
 marginalia-platform.workspace = true
 marginalia-remarkable.workspace = true
+marginalia-annotations.workspace = true
 marginalia-observability.workspace = true
 marginalia-zotero = { workspace = true, optional = true }
 marginalia-sync = { workspace = true, optional = true }

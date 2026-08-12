@@ -16,7 +16,7 @@ RM_TARGET := armv7-unknown-linux-gnueabihf
 RM_HOST   ?= 10.11.99.1
 PORTABLE  := -p marginalia-core -p marginalia-safety -p marginalia-observability \
              -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero \
-             -p marginalia-library-folder
+             -p marginalia-library-folder -p marginalia-annotations
 # Not $TMPDIR: on macOS that lives under /var, which the agent refuses to write
 # to. The refusal is correct -- /var belongs to the device -- so the dev home
 # goes somewhere unambiguously ours instead.
@@ -221,6 +221,7 @@ docs:
 	@echo "  README.md                                    what this is"
 	@echo "  docs/INSTALL.md                              install on your computer"
 	@echo "  docs/INSTALL_REMARKABLE.md                   install on your reMarkable"
+	@echo "  docs/USING_MARGINALIA.md                     how to actually use it"
 	@echo "  ROADMAP.md                                   what is built and what is next"
 	@echo ""
 	@echo "  docs/architecture/ARCHITECTURE.md            the design"
