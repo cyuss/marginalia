@@ -90,9 +90,16 @@ The central claim is verified by a `compile_fail` doctest in
 `packages/safety/src/lib.rs`: constructing a `WriteGrant` outside the safety
 crate does not compile.
 
-**Not verified on this machine:** the TypeScript/Tauri side. The development
-machine runs Node 18, and the toolchain requires Node 20+. `pnpm typecheck` and
-`pnpm dev` were not executed; the frontend is written but unproven.
+**Verified 2026-08-12**, after Node 20 was installed on the development machine:
+
+```
+pnpm typecheck                              clean (tsc --noEmit, strict)
+vite build     87 modules · 177 kB · 56 kB gzipped
+```
+
+The Tauri shell itself still has not been launched — that needs a windowing
+session — but the TypeScript compiles under strict settings and the bundle
+builds.
 
 ## Phase 0 exit criteria
 
