@@ -36,6 +36,14 @@ pub struct FirmwareVersion {
     pub major: u32,
     pub minor: u32,
     pub patch: u32,
+    /// The fourth component reMarkable actually ships, as in `3.28.0.166`.
+    ///
+    /// Kept rather than discarded: two images differing only here are different
+    /// images, and a bug report that cannot tell them apart is worth less. No
+    /// matrix range keys on it — ranges are `major.minor` — so it never widens
+    /// what a capability lookup will match.
+    #[serde(default)]
+    pub build: Option<u32>,
 }
 
 impl FirmwareVersion {
@@ -53,11 +61,13 @@ impl FirmwareVersion {
         let major = next("major")?;
         let minor = next("minor")?;
         let patch = next("patch").unwrap_or(0);
+        let build = next("build").ok();
         Ok(Self {
             raw: raw.to_string(),
             major,
             minor,
             patch,
+            build,
         })
     }
 
@@ -286,6 +296,35 @@ mod tests {
         let fw = FirmwareVersion::parse("3.11.2").unwrap();
         assert_eq!((fw.major, fw.minor, fw.patch), (3, 11, 2));
         assert_eq!(fw.raw, "3.11.2");
+    }
+
+    /// The string a real reMarkable 2 reports, taken from
+    /// `/usr/share/remarkable/update.conf` on hardware running 3.28.
+    ///
+    /// Four components, not three. Before this was checked against a device,
+    /// the parser dropped the fourth silently and `/etc/version` — a build
+    /// timestamp — was being reported to users as the firmware.
+    #[test]
+    fn the_four_component_version_a_device_actually_reports_survives_parsing() {
+        let fw = FirmwareVersion::parse("3.28.0.166").unwrap();
+        assert_eq!((fw.major, fw.minor, fw.patch), (3, 28, 0));
+        assert_eq!(fw.build, Some(166));
+        assert_eq!(fw.raw, "3.28.0.166");
+
+        // Two builds of the same release are not the same image.
+        let other = FirmwareVersion::parse("3.28.0.167").unwrap();
+        assert_ne!(fw, other);
+
+        // But the build number never widens a capability lookup: ranges are
+        // major.minor, so both resolve identically against the matrix.
+        assert!(fw.matches_range("3.28"));
+        assert!(other.matches_range("3.28"));
+        assert!(!fw.matches_range("3.11"));
+    }
+
+    #[test]
+    fn a_three_component_version_has_no_build_rather_than_a_guessed_zero() {
+        assert_eq!(FirmwareVersion::parse("3.11.2").unwrap().build, None);
     }
 
     #[test]
