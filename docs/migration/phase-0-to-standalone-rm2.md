@@ -132,18 +132,18 @@ Each slice is independently reversible and leaves every test green.
 | # | Slice | Size | Risk |
 |---|---|---|---|
 | 1 | ~~`git init`, commit baseline, tag~~ **done** | trivial | none |
-| 2 | Architecture + characterization tests (**done this session**) | done | none |
-| 3 | Make the SQLite journal mode / pragmas a `StorageProfile` parameter instead of a hard-coded WAL | small | low |
-| 4 | Split `DeviceProvider` into on-device introspection vs. host-side transport | small | low — no implementations exist yet |
-| 5 | Add a `CredentialStore` port; desktop impl = keyring, device impl = 0600 file, both redaction-tested | small | medium (secrets) |
-| 6 | Add a `Clock` port (`Utc::now()` is called directly in several places) so device tests can control time | small | low |
-| 7 | Cross-compilation CI job for the portable crates | small | low |
-| 8 | Resolve the cross-C toolchain so `marginalia-database` builds for ARM | medium | low |
-| 9 | Extend the simulator with device-side faults (low storage, process kill, corrupt DB, clock skew) | medium | low |
+| 2 | ~~Architecture + characterization tests~~ **done** | done | none |
+| 3 | ~~`StorageProfile` parameter instead of hard-coded WAL~~ **done** | small | low |
+| 4 | ~~Split `DeviceProvider`~~ **done** — `DeviceIntrospection` + `RemoteDeviceTransport` | small | low |
+| 5 | ~~`CredentialStore` port~~ **done** (port only; impls deferred to their consumer) | small | medium |
+| 6 | ~~`Clock` port~~ **done** | small | low |
+| 7 | ~~Cross-compilation CI job~~ **done** | small | low |
+| 8 | Cross-C toolchain for `marginalia-database` — **blocked: no Docker or `cross` available here** | medium | low |
+| 9 | ~~Simulator device-side faults~~ **done** — 10 tests | medium | low |
 | 10 | Minimal `apps/remarkable` smoke app | medium | **gated on §6** |
 
-Slices 1–9 are worth doing under **every** outcome of the §6 decision. Slice 10
-is not.
+Slices 1–9 were worth doing under **every** outcome of the §6 decision; all but
+slice 8 are now complete. Slice 10 remains gated.
 
 ## 5. Database compatibility
 

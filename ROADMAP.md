@@ -97,16 +97,17 @@ Slices, each independently reversible and green:
 
 - ☑ **1. `git init`, baseline commit, tag `phase-0.5-audit`** — done 2026-08-12. A true `phase-0-baseline` tag is not achievable retroactively (the repository was created after the audit); the Phase 0 evidence lives in [PHASE_0_REPORT.md](docs/development/PHASE_0_REPORT.md) instead. Every slice from here gets its own commit.
 - ☑ 2. architecture + characterization tests
-- ☐ 3. `StorageProfile` parameter instead of hard-coded WAL ([ADR-005](docs/adr/ADR-005-device-storage-profile.md))
-- ☐ 4. split `DeviceProvider` into on-device introspection vs. host-side transport
-- ☐ 5. `CredentialStore` port; desktop keyring + device 0600 file ([ADR-004](docs/adr/ADR-004-device-credentials.md))
-- ☐ 6. `Clock` port so device tests can control time
-- ☐ 7. cross-compilation CI job for the portable crates
-- ☐ 8. resolve the cross-C toolchain so `marginalia-database` builds for ARM (U17)
-- ☐ 9. extend the simulator with device-side faults
+- ☑ 3. `StorageProfile` parameter instead of hard-coded WAL ([ADR-005](docs/adr/ADR-005-device-storage-profile.md)) — device profile is conservative until U12 is measured
+- ☑ 4. split `DeviceProvider` into `DeviceIntrospection` (on-device) and `RemoteDeviceTransport` (companion)
+- ☑ 5. `CredentialStore` port + `Redacted` moved into the core ([ADR-004](docs/adr/ADR-004-device-credentials.md)); implementations deferred to the setup flow that needs them
+- ☑ 6. `Clock` port; repositories and migrations use it
+- ☑ 7. cross-compilation CI job for the portable crates
+- ◐ 8. cross-C toolchain so `marginalia-database` builds for ARM (U17) — **needs Docker or `cross`, neither available on the machine where Phase 0.5 ran.** Not wired into CI rather than shipping an unverified step.
+- ☑ 9. simulator device-side faults: power loss, corruption, truncation, storage pressure, clock skew
 - ⚠ 10. minimal `apps/remarkable` smoke app — **gated on ADR-002**
 
-Slices 1–9 are worth doing under every outcome of ADR-002. Slice 10 is not.
+Slices 1–9 were worth doing under every outcome of ADR-002, and all but slice 8
+are complete. Slice 10 is gated.
 
 ### Deliberately not done
 
