@@ -33,12 +33,14 @@ Document state machine: **20 legal edges** out of 120 (state, event) pairs.
 Device operations: **23**, classified 9 GREEN / 4 YELLOW / 2 ORANGE / 8 RED.
 Feature flags: **8**, all OFF.
 
-> ⚠ **The baseline cannot be tagged.** `/Users/youcef/Desktop/projects/marginalia`
-> is **not a git repository** (`git rev-parse` fails). The roadmap requires
-> "tag the baseline" and "work in small commits"; neither is possible today.
-> This is the single cheapest blocker to clear and should be cleared before any
-> code moves — otherwise the incremental-extraction strategy has no way to be
-> incremental, and no way to roll back.
+> **Resolved 2026-08-12.** The directory was not a git repository when the audit
+> ran. It now is: initial commit `cf56d63`, tagged `phase-0.5-audit`. A
+> `phase-0-baseline` tag pointing at a Phase-0-only tree is not achievable
+> retroactively, because the repository was created after the audit artifacts
+> already existed; the Phase 0 evidence is recorded in
+> [PHASE_0_REPORT.md](../development/PHASE_0_REPORT.md) instead. From here every
+> migration slice gets its own commit, which is what the incremental strategy
+> actually needs.
 
 ## 2. What the audit actually found
 
@@ -129,7 +131,7 @@ Each slice is independently reversible and leaves every test green.
 
 | # | Slice | Size | Risk |
 |---|---|---|---|
-| 1 | `git init`, commit baseline, tag `phase-0-baseline` | trivial | none |
+| 1 | ~~`git init`, commit baseline, tag~~ **done** | trivial | none |
 | 2 | Architecture + characterization tests (**done this session**) | done | none |
 | 3 | Make the SQLite journal mode / pragmas a `StorageProfile` parameter instead of a hard-coded WAL | small | low |
 | 4 | Split `DeviceProvider` into on-device introspection vs. host-side transport | small | low — no implementations exist yet |
@@ -206,9 +208,16 @@ It is a genuinely different product shape — worse for interactivity, far bette
 for safety — and it is the only option I can currently see that does not
 require relaxing an invariant.
 
-### What I need from you
+### Decision taken
 
-Phase 1 cannot start until this is decided. Slices 1–9 in §4 proceed regardless.
+**Gather evidence before choosing.** A read-only hardware spike protocol is
+written and ready to run:
+[`../remarkable/DISPLAY_ACCESS_SPIKE.md`](../remarkable/DISPLAY_ACCESS_SPIKE.md).
+It writes nothing to the device, stops no service, installs nothing, and
+resolves U11 plus — opportunistically — U12, U16 and the first real resource
+baseline. ADR-002 stays open until the evidence is in.
+
+Phase 1 cannot start until then. Slices 2–9 in §4 proceed regardless.
 
 ## 7. Unknowns
 

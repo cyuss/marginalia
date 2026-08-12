@@ -25,7 +25,9 @@ companion and power mode**. No essential RM2 workflow may depend on it.
 > requirement may be unsatisfiable alongside safety invariants 1–4. See
 > [ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md) and
 > [the audit report](docs/migration/phase-0-to-standalone-rm2.md) §6.
-> A decision is required before Phase 1 work begins.
+> A decision is required before Phase 1 work begins. **Chosen route: gather
+> evidence first** — see the read-only
+> [hardware spike protocol](docs/remarkable/DISPLAY_ACCESS_SPIKE.md).
 
 Phases are sequential. A phase does not start while a previous phase has failing
 tests or unresolved safety regressions. Phase 0 is the validated baseline and is
@@ -93,8 +95,8 @@ Schema version 1, 18 tables. 20 state-machine edges. 23 device operations
 
 Slices, each independently reversible and green:
 
-- ☐ **1. `git init`, commit the baseline, tag `phase-0-baseline`** — the repository is currently not under version control, which blocks the entire incremental strategy
-- ☐ 2. ~~architecture + characterization tests~~ ☑ done
+- ☑ **1. `git init`, baseline commit, tag `phase-0.5-audit`** — done 2026-08-12. A true `phase-0-baseline` tag is not achievable retroactively (the repository was created after the audit); the Phase 0 evidence lives in [PHASE_0_REPORT.md](docs/development/PHASE_0_REPORT.md) instead. Every slice from here gets its own commit.
+- ☑ 2. architecture + characterization tests
 - ☐ 3. `StorageProfile` parameter instead of hard-coded WAL ([ADR-005](docs/adr/ADR-005-device-storage-profile.md))
 - ☐ 4. split `DeviceProvider` into on-device introspection vs. host-side transport
 - ☐ 5. `CredentialStore` port; desktop keyring + device 0600 file ([ADR-004](docs/adr/ADR-004-device-credentials.md))
