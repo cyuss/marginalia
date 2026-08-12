@@ -1,0 +1,15 @@
+[package]
+name = "marginalia-remarkable"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The device boundary: DeviceProvider port, capability resolution, firmware compatibility matrix. No transport implementation in Phase 0."
+
+[dependencies]
+marginalia-core.workspace = true
+marginalia-safety.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+toml.workspace = true
+tracing.workspace = true

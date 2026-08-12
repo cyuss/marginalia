@@ -1,0 +1,51 @@
+# Marginalia — Rust core workspace.
+#
+# WHY this workspace excludes apps/desktop/src-tauri:
+# The Tauri 2 shell requires a much newer Rust toolchain than the core crates do.
+# Keeping the core in its own workspace means the domain, safety and database
+# layers — the parts that carry the device-safety guarantees — can be built and
+# tested on a modest toolchain, in CI, and by contributors who are not working on
+# the UI. apps/desktop/src-tauri declares its own [workspace] and is built
+# separately.
+[workspace]
+resolver = "2"
+members = [
+  "packages/core",
+  "packages/safety",
+  "packages/observability",
+  "packages/database",
+  "packages/remarkable",
+  "tests/remarkable-simulator",
+  "tests/safety",
+  "tests/architecture",
+  "tests/characterization",
+]
+# The Tauri app is its own workspace (see the note above). Excluding it
+# explicitly keeps its heavy, fast-moving dependency tree out of the core
+# workspace's lockfile and CI job.
+exclude = ["apps/desktop/src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/USER/marginalia"
+
+[workspace.dependencies]
+marginalia-core = { path = "packages/core" }
+marginalia-safety = { path = "packages/safety" }
+marginalia-observability = { path = "packages/observability" }
+marginalia-database = { path = "packages/database" }
+marginalia-remarkable = { path = "packages/remarkable" }
+marginalia-simulator = { path = "tests/remarkable-simulator" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+ulid = "1"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+toml = "0.8"
+rusqlite = { version = "0.30", features = ["bundled"] }

@@ -1,0 +1,15 @@
+[package]
+name = "marginalia-safety-suite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The mandatory safety suite. Never skipped, never marked flaky."
+publish = false
+
+[dependencies]
+marginalia-core.workspace = true
+marginalia-safety.workspace = true
+marginalia-remarkable.workspace = true
+marginalia-database.workspace = true
+marginalia-simulator.workspace = true
+chrono.workspace = true

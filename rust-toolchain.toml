@@ -1,0 +1,8 @@
+# The toolchain this project is developed and tested against.
+#
+# 1.77 is the floor imposed by Tauri 2; we pin a later stable so that the
+# dependency tree resolves consistently for everyone. rustup installs this
+# automatically the first time you run cargo in this directory.
+[toolchain]
+channel = "1.85.0"
+components = ["rustfmt", "clippy"]

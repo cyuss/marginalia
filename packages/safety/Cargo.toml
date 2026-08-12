@@ -1,0 +1,14 @@
+[package]
+name = "marginalia-safety"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SafetyManager, operation classification, write grants, feature flags, snapshots. The only place a device write can be authorised."
+
+[dependencies]
+marginalia-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+tracing.workspace = true

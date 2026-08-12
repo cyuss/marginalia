@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Marginalia",
+  "version": "0.1.0",
+  "identifier": "org.marginalia.app",
+  "build": {
+    "beforeDevCommand": "pnpm dev:web",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "vite build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Marginalia",
+        "width": 1100,
+        "height": 760,
+        "minWidth": 860,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Research and annotation companion for reMarkable",
+    "longDescription": "A local-first research, reading and annotation companion connecting Zotero to a reMarkable."
+  }
+}

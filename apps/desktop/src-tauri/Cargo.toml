@@ -1,0 +1,30 @@
+# The Tauri shell.
+#
+# WHY this declares its own [workspace]: Tauri 2 requires a much newer Rust
+# toolchain than the core crates need. Keeping it out of the root workspace
+# means the domain, safety and database layers -- the parts carrying the
+# device-safety guarantees -- stay buildable and testable on a modest
+# toolchain and in a fast CI job.
+[workspace]
+
+[package]
+name = "marginalia-desktop"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Marginalia desktop application."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+marginalia-core = { path = "../../../packages/core" }
+marginalia-safety = { path = "../../../packages/safety" }
+marginalia-database = { path = "../../../packages/database" }
+marginalia-remarkable = { path = "../../../packages/remarkable" }
+marginalia-observability = { path = "../../../packages/observability" }
+
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"

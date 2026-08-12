@@ -1,0 +1,148 @@
+# Marginalia — reMarkable firmware compatibility matrix.
+#
+# This file is DATA. It is deliberately separate from feature code so that a
+# capability claim can be reviewed on its own.
+#
+# ── Rules ───────────────────────────────────────────────────────────────────
+#
+# 1. `tested_at` empty  ⇒  the loader forces UNKNOWN, whatever `status` says.
+#    Optimism in a data file must not grant permissions.
+#
+# 2. UNKNOWN ⇒ read-only. Always.
+#
+# 3. An entry may only leave UNKNOWN via the validation procedure in
+#    docs/remarkable/COMPATIBILITY_MODEL.md §6, and the validation write-up
+#    must land in the same pull request.
+#
+# ── Current state ───────────────────────────────────────────────────────────
+#
+# Nothing has been validated on hardware yet. Every capability below is
+# therefore UNKNOWN, which means Marginalia can currently do nothing to a
+# device at all. That is the correct state for Phase 0.
+#
+# See docs/development/OPEN_QUESTIONS.md — U1, U2, U3, U5, U6.
+
+# ── Reads ───────────────────────────────────────────────────────────────────
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "DeviceInfoRead"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 2. Awaiting first read-only probing session on hardware."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "StorageRead"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 2."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "MetadataRead"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 2. Document listing and uuids."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "NativeTagsRead"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 8 read direction. See OPEN_QUESTIONS U5."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "AnnotationRead"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 4. Blocked on OPEN_QUESTIONS U2 and U3."
+
+# ── Writes — the four whitelisted operations ────────────────────────────────
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "SafeDocumentTransfer"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = """
+Phase 3, blocked on OPEN_QUESTIONS U1 (which transport). Must not move off
+UNKNOWN until the full simulator fault suite is green AND a real-device test
+with a throwaway PDF has verified checksum, listing, rollback, and that an
+unrelated document was untouched.
+"""
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "DocumentRemoval"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 3. Only ever for documents Marginalia itself transferred."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "NativeTagsWrite"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 8. A read-only tag bridge is an acceptable V1 if this stays UNKNOWN."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "PdfAnnotationExport"
+status = "UNKNOWN"
+tested_at = ""
+method = "tbd"
+notes = "Phase 4, behind the native_pdf_annotations flag. See OPEN_QUESTIONS U8."
+
+# ── Experimental — Phase 10 at the earliest ────────────────────────────────
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "CompanionApp"
+status = "UNSUPPORTED"
+tested_at = "2026-08-12"
+method = "policy"
+notes = "Not implemented in V1. Requires a written risk assessment first."
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "ExperimentalRmUi"
+status = "UNSUPPORTED"
+tested_at = "2026-08-12"
+method = "policy"
+notes = "Not implemented. Would require UI-side integration; out of scope."
+
+# ── Never ───────────────────────────────────────────────────────────────────
+
+[[entry]]
+model = "RM2"
+firmware = "3.x"
+capability = "SystemModification"
+status = "UNSUPPORTED"
+tested_at = "2026-08-12"
+method = "policy"
+notes = """
+Permanently unsupported, on every model and every firmware. This entry exists
+so the refusal is explicit and auditable rather than merely absent. There is no
+implementation behind this capability and there will never be one.
+"""
