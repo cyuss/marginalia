@@ -1,16 +1,14 @@
-# Marginalia — Rust core workspace.
+# Marginalia — Rust workspace.
 #
-# WHY this workspace excludes apps/desktop/src-tauri:
-# The Tauri 2 shell requires a much newer Rust toolchain than the core crates do.
-# Keeping the core in its own workspace means the domain, safety and database
-# layers — the parts that carry the device-safety guarantees — can be built and
-# tested on a modest toolchain, in CI, and by contributors who are not working on
-# the UI. apps/desktop/src-tauri declares its own [workspace] and is built
-# separately.
+# One workspace, one toolchain, no JavaScript. There was a second workspace for
+# a Tauri desktop shell; it was six screens of mock interface wired to nothing,
+# it had never once built (its icons were missing), and it cost two CI jobs. The
+# terminal interface in apps/tui replaces it and lives here with everything else.
 [workspace]
 resolver = "2"
 members = [
   "apps/remarkable",
+  "apps/tui",
   "packages/core",
   "packages/safety",
   "packages/observability",
@@ -26,10 +24,6 @@ members = [
   "tests/architecture",
   "tests/characterization",
 ]
-# The Tauri app is its own workspace (see the note above). Excluding it
-# explicitly keeps its heavy, fast-moving dependency tree out of the core
-# workspace's lockfile and CI job.
-exclude = ["apps/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -53,6 +47,8 @@ marginalia-simulator = { path = "tests/remarkable-simulator" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libc = "0.2"
+ratatui = "0.29"
+crossterm = "0.28"
 thiserror = "1"
 ulid = "1"
 chrono = { version = "0.4", features = ["serde"] }

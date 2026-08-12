@@ -1,8 +1,8 @@
 # The toolchain this project is developed and tested against.
 #
-# 1.77 is the floor imposed by Tauri 2; we pin a later stable so that the
-# dependency tree resolves consistently for everyone. rustup installs this
-# automatically the first time you run cargo in this directory.
+# Pinned so the dependency tree resolves consistently for everyone. rustup
+# installs it automatically the first time you run cargo in this directory.
+# (The old floor here was Tauri 2's; that shell is gone and no longer sets it.)
 #
 # Raised from 1.85 to 1.90 when the Zotero HTTP client landed: ureq's TLS chain
 # pulls in the icu_* crates, which require 1.86+. Pinning around them was

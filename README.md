@@ -19,20 +19,24 @@ exactly as it is.
 
 ---
 
-> ### Status — early, and honest about it
+> ### Status — it works on real hardware, and here is exactly how far
 >
-> **Works, and is covered by 349 tests:** the domain and safety layers, local
-> storage, the device simulator, two library sources (a folder, and Zotero with
-> incremental sync), and an agent that cross-compiles for the reMarkable 2 and
-> **runs** — verified under emulation, including reaching the live Zotero API
-> over TLS.
+> **Verified on a reMarkable 2 running firmware 3.28.0.166**, with 3,814
+> documents on it:
 >
-> **Not done:** no reMarkable has been touched yet. Generating the documents you
-> would actually read is the next phase, and it is
-> [not certain that highlighted text can be recovered at all](docs/development/OPEN_QUESTIONS.md)
-> on current firmware.
+> - installs into one directory, verified by checksum, and removes itself
+>   completely — documents, reading positions and `xochitl` untouched
+> - **reads 2,624 highlights across 26 documents**, with page numbers, and
+>   exports them as Markdown
+> - 13 MB of memory, 0.11 s, no process left running
+> - on unvalidated firmware it permits **no writes at all**, which was observed
+>   rather than assumed
 >
-> Built in public, phase by phase, with every unknown written down.
+> **Not done yet:** generated review documents, the stylus request form, and
+> explicit document transfer. See the [roadmap](ROADMAP.md).
+>
+> Everything above is recorded, with what broke and what it cost, in
+> [HARDWARE_VALIDATION.md](docs/remarkable/HARDWARE_VALIDATION.md).
 
 ## Why
 
@@ -127,6 +131,62 @@ fn upload_document(&mut self, grant: &WriteGrant, pdf: &ValidatedPdf, name: &str
     -> DeviceResult<RemarkableDocumentId>;
 ```
 
+## What is in scope, and what never will be
+
+A tool that promises not to touch your device has to say what it therefore
+cannot do. This is that list.
+
+### Kept
+
+| | |
+|---|---|
+| **The on-device agent** | One binary, one directory, no daemon. 13 MB, exits when done. |
+| **Highlight extraction** | Reads what the device already stored. Works today: 2,624 highlights on the machine it was built against. |
+| **Persistence with history** | Versioned extraction, so a format correction can be re-run rather than silently disagreeing with old rows. |
+| **Markdown and JSON export** | Your reading, in files you own, readable without Marginalia. |
+| **Generated review documents** | Digests written *into your library*, opened by the native reader. The only screen Marginalia will ever have. |
+| **Explicit document transfer** | One document, because you asked for that document. |
+| **Library sources as plug-ins** | A folder needs no network. Zotero is one source, not the point. |
+| **The safety model** | Capability matrix, fail-closed permissions, install manifest, one-command removal that verifies itself. |
+| **The request form** | A tick box on a generated index, read back from the annotation layer. |
+| **The terminal interface** | `apps/tui` — install, check, configure and remove without memorising commands. |
+
+### Excluded, permanently
+
+| Not this | Why |
+|---|---|
+| **Any Marginalia interface on the device** — split view, sidebar, overlays, a command palette | There is no way to draw on a reMarkable 2 screen without modifying software that belongs to reMarkable. Not a limitation we plan to overcome. |
+| **Patching `xochitl`** | It is invariant 1. It is also how [`ddvk/remarkable-hacks`](https://github.com/ddvk/remarkable-hacks) genuinely does add menu items — so this is a refusal, not an impossibility. See below. |
+| **Writing tags into the device's own metadata** | A read-only bridge is an acceptable final answer. |
+| **Annotating original PDFs on the device** | A PDF stack on armv7 to reproduce text that is already text. Export Markdown instead. |
+| **OCR or handwriting recognition** | Out of scope; the device already does handwriting search. |
+| **A package manager, or a system service** | Invariant. Marginalia does not survive a reboot by installing itself into one. |
+| **Cloud sync of Marginalia's data** | Local-first. Your reading does not need a server. |
+| **Automatic file transfer** | Sync moves metadata. Moving a document is always a separate, explicit request. |
+| **A Tauri desktop application** | Removed 2026-08-13: six screens of mock interface wired to nothing, which had never once built. The terminal interface replaces it. |
+
+### About the interface question, honestly
+
+`ddvk/remarkable-hacks` really does add elements to the native interface, and it
+is worth understanding how, because the answer decides this project's shape: it
+**edits the bytes of the `xochitl` binary** in `/usr/bin`, per exact firmware
+build, keeping a backup to undo it.
+
+So drawing on the screen is possible. It is refused here, for a reason that
+would hold even if it were effortless: the promise that Marginalia leaves your
+device's own software alone is the reason it is safe to install. A version that
+patched `xochitl` would be a different program making a different promise.
+
+Two practical notes, separate from the principle. That project's patches stop at
+firmware **2.15.1.1189** and its last commit was **June 2023**; a device on 3.x
+has nothing to apply. And its own README states that using it violates the
+reMarkable EULA and may cost you data. If you want it, install it deliberately
+and knowingly — it is an honest bargain, openly described. It is simply not this
+one.
+
+The full reasoning, including the options that were considered and rejected, is
+in [ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md).
+
 ## What Marginalia may do to your device
 
 Four operations. That is the entire list.
@@ -212,6 +272,15 @@ make setup            # or: just setup — identical names in both
 
 Everything runs through `make` or `just`:
 
+Then, for everything else, the terminal interface:
+
+```bash
+make tui              # install, check, configure, remove — without memorising commands
+```
+
+It runs the same scripts documented below, and hands the terminal over whenever
+something needs an answer from you, so you type your own confirmations.
+
 ```bash
 make check                  # everything CI runs
 make build-device-docker    # build the agent for the reMarkable (needs only Docker)
@@ -219,9 +288,9 @@ make verify-device-binary   # run that ARM binary under emulation
 make device                 # what you can do to a connected device
 ```
 
-You need **Rust 1.90+**, **Node 20+**, and **Docker** for device builds. You do
-**not** need a reMarkable or a Zotero account to develop — there is a simulator
-and synthetic fixtures.
+You need **Rust 1.90+** and **Docker** for device builds. There is no Node, no
+JavaScript and no bundler. You do **not** need a reMarkable or a Zotero account
+to develop — there is a simulator and synthetic fixtures.
 
 ### Adding a source
 
@@ -253,7 +322,7 @@ never reaches your disk, so setup cannot appear to succeed while nothing works.
 flowchart TD
     subgraph apps["applications"]
         AG["apps/remarkable<br/><i>the on-device agent</i>"]
-        DK["apps/desktop<br/><i>optional companion</i>"]
+        TU["apps/tui<br/><i>terminal interface</i>"]
     end
     subgraph app["application layer"]
         SY["sync<br/><i>the use case</i>"]
@@ -271,7 +340,7 @@ flowchart TD
     end
 
     AG --> SY
-    DK --> SY
+    TU -.->|"runs the scripts,<br/>links nothing"| AG
     SY --> ZO & FO & DB
     ZO & FO & DB & PL & RM --> CO
     RM --> SA
@@ -290,10 +359,10 @@ the safety rules be tested exhaustively without hardware.
 | | |
 |---|---|
 | **Sources** | Zotero · a folder of documents · more behind the same port |
-| **Language** | Rust (portable core) · TypeScript + React (desktop companion) |
-| **Storage** | SQLite — WAL on the desktop, rollback journal and `synchronous=FULL` on the device |
+| **Language** | Rust, everywhere. No JavaScript. |
+| **Storage** | SQLite — rollback journal and `synchronous=FULL` on the device, WAL on a workstation |
 | **Device target** | `armv7-unknown-linux-gnueabihf`, built in a container |
-| **Desktop shell** | Tauri 2 |
+| **Terminal interface** | ratatui — runs on your computer, drives the agent over SSH |
 
 ## Privacy
 

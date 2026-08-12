@@ -53,15 +53,15 @@ partially overwrite a source.
 ## 3. Deployment shape
 
 ```
-                         DESKTOP  (macOS / Windows / Linux)
+                    THE reMARKABLE 2  (the only required runtime)
 
-                              Zotero  (local SQLite / Web API)
+                     a folder, or Zotero  (a LibraryProvider)
                                  │
                                  ▼
              ┌───────────────────────────────────────────┐
-             │            Marginalia (Tauri 2)           │
+             │        the agent — headless, on-device    │
              │                                           │
-             │   React + TS UI  ◄── IPC ──►  Rust core   │
+             │   no screen access, no xochitl, one dir   │
              └───────────────────────┬───────────────────┘
                                      │
         ┌───────────────┬────────────┼────────────┬───────────────┐
@@ -89,11 +89,10 @@ desktop**. Nothing runs on the reMarkable in V1.
 ```
 marginalia/
 ├── apps/
-│   ├── desktop/                  Tauri 2 shell — React UI + Rust binary
-│   └── remarkable-companion/     Phase 10 only. Empty placeholder in V1.
+│   ├── remarkable/               the on-device agent — the product
+│   └── tui/                      terminal interface, runs on your computer
 │
 ├── packages/
-│   ├── shared-types/             TS types generated from Rust (ts-rs)
 │   ├── core/                     domain entities, state machines, errors
 │   ├── database/                 SQLite access, migrations, repositories
 │   ├── safety/                   SafetyManager, classification, snapshots
@@ -118,18 +117,23 @@ marginalia/
 └── CLAUDE.md README.md ROADMAP.md SECURITY.md CONTRIBUTING.md LICENSE
 ```
 
-**Rust crates** live under `packages/*` as a Cargo workspace; **TS packages**
-under the same paths as a pnpm workspace. A package is either a Rust crate, a TS
-package, or both (`core` is both: Rust source of truth + generated TS types).
+Everything under `packages/*` is a Rust crate in one Cargo workspace. There is
+no JavaScript in this project, and no second workspace.
 
 Dependency rule — strictly acyclic, pointing inward:
 
 ```
-features/*  →  packages/ui, packages/shared-types
-apps/desktop → features/*, packages/*
-packages/{zotero,remarkable,annotations,pdf,search,sync} → core, database, safety
+apps/remarkable  →  packages/*            the agent composes adapters
+apps/tui         →  (nothing)             it runs the scripts; it links no crate
+packages/sync    →  core, database, and the LibraryProviders
+packages/{zotero, library-folder, annotations, remarkable, database, platform}
+                 →  core   (annotations and remarkable stay unaware of each other)
 packages/{core, safety}  →  (nothing above them)
 ```
+
+`apps/tui` depending on nothing is deliberate and enforced: a terminal interface
+that linked these crates could grow its own copy of the install and removal
+rules, and there would then be two places for those rules to be wrong.
 
 `packages/core` depends on nothing else in the repo. `packages/safety` depends
 only on `core`. Nothing may reach the device except through
@@ -145,7 +149,7 @@ see [§6](#6-the-safety-boundary).
 | **Application** | `sync`, `annotations`, `search` — use cases, orchestration | Only via ports |
 | **Ports** | `BibliographyProvider`, `DeviceProvider`, `AnnotationProvider`, `StorageProvider`, `SearchProvider` | Interface only |
 | **Adapters** | `zotero`, `remarkable`, `pdf`, `database` | Yes, concretely |
-| **Presentation** | `apps/desktop`, `features/*`, `ui` | No — commands only |
+| **Presentation** | `apps/tui` — a front door to the scripts | No — it shells out |
 
 The domain layer is pure and exhaustively testable without a device, a network,
 or a filesystem. That is what makes the simulator strategy work.
@@ -246,10 +250,13 @@ transitions are unrepresentable or return a typed error. No boolean soup
 ## 11. Technology
 
 See [`ADR-001-backend-stack.md`](./ADR-001-backend-stack.md) for the reasoning.
-Summary: Tauri 2 + React 19 + TypeScript + Vite + Tailwind + Radix + TanStack
-Query, Rust core, `pdfium-render` for PDF text geometry, `lopdf` for derived
-annotated PDFs, no Python sidecar in V1 (interface preserved so one can be added
-without redesign).
+Summary, as it stands after hardware: Rust everywhere, SQLite compiled into the
+binary, `ratatui` for the terminal interface, `ureq` for Zotero. No JavaScript.
+
+ADR-001 chose a Tauri + React desktop stack; that shell was removed in August
+2026 and the ADR carries a superseding note. `pdfium-render` and `lopdf` were
+chosen for recovering highlighted text from stroke geometry — work that turned
+out to be unnecessary, because the device stores the text.
 
 ## 12. Security and privacy posture
 

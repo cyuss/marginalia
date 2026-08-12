@@ -58,6 +58,11 @@ const FORBIDDEN_EXTERNAL_DEPS: &[(&str, &str)] = &[
     ("tauri-build", "desktop shell"),
     ("wry", "desktop webview"),
     ("tao", "desktop windowing"),
+    // The terminal interface is a host program and may use these. A crate that
+    // has to run on the reMarkable may not: the agent is headless, there is no
+    // terminal attached to it, and drawing anywhere is what ADR-002 rules out.
+    ("ratatui", "terminal interface — host only"),
+    ("crossterm", "terminal control — host only"),
     ("napi", "Node binding"),
     ("neon", "Node binding"),
     (
@@ -171,6 +176,13 @@ fn allowed_internal_deps() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         "marginalia-agent",
         PORTABLE_CRATES.iter().copied().collect(),
     );
+
+    // The terminal interface depends on nothing in the workspace, and that is
+    // the point. It runs the scripts in tools/device/ and the agent over SSH,
+    // so it cannot grow its own copy of the install, transfer or removal rules.
+    // The day it needs to link one of these crates is the day it has started
+    // duplicating logic that already exists and is already tested.
+    m.insert("marginalia-tui", BTreeSet::new());
 
     for test_crate in [
         "marginalia-simulator",

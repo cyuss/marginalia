@@ -3,11 +3,25 @@
 - **Status:** Proposed (awaiting validation)
 - **Date:** 2026-08-12
 - **Deciders:** project lead
-- **⚠ Revisit:** this ADR assumed a **desktop** target. The standalone
-  reMarkable 2 decision invalidates its central assumption for on-device PDF
-  work — there is no obvious prebuilt PDFium for `armv7-unknown-linux-gnueabihf`.
-  Recorded as U15. The licensing reasoning below still holds; the binary
-  availability reasoning does not.
+- **⚠ Superseded in part, 2026-08-13.** Two of this ADR's choices are gone, and
+  it is kept as a record rather than rewritten.
+
+  **The desktop stack.** Tauri 2 + React + TypeScript was chosen for a
+  desktop-first product. That product no longer exists: the essential workflow
+  runs on the device, and the Tauri shell — six screens wired to nothing, which
+  had never once built — was deleted. The terminal interface in `apps/tui`
+  replaces it. There is no JavaScript in this project.
+
+  **The PDF stack.** `pdfium-render` and `lopdf` were chosen to recover
+  highlighted text by intersecting stroke geometry with a PDF text layer. On
+  hardware, the reMarkable turned out to store highlighted text *as text*
+  ([HARDWARE_VALIDATION.md](../remarkable/HARDWARE_VALIDATION.md) §2), so that
+  work is not needed and U15 — no prebuilt PDFium for
+  `armv7-unknown-linux-gnueabihf` — is no longer on the critical path.
+
+  What still holds: the licensing reasoning, the preference for compiling
+  SQLite into the binary, and the decision to keep a port boundary where a
+  Python sidecar could later sit.
 
 ---
 

@@ -1,55 +1,65 @@
-# Marginalia / reMarkFlow — Roadmap
+# Marginalia — Roadmap
 
-Status: **Draft v2 — Phase 0 complete; standalone-RM2 adaptation in progress**
-Primary target: **reMarkable 2**, as the primary autonomous runtime
-Repository model: one pnpm + Cargo monorepo
+Status: **the core loop reads real highlights off real hardware**
+Target: **reMarkable 2**, as the primary and only required runtime
+Repository: one Cargo workspace, no JavaScript
 
-> **Naming is unresolved.** The code, crates, database and documentation all say
-> **Marginalia**, per an explicit instruction. The v2 roadmap heading says
-> **reMarkFlow (working name)**. Nothing has been renamed; a rename would touch
-> every manifest, import path, table comment and document, and is a decision
-> worth making once. See the open item at the end of this file.
+## What this is
 
-## Product decision (v2)
+Marginalia turns what you already do on a reMarkable — reading and highlighting
+— into durable, portable notes, **without changing the device or how you use
+it**.
 
-Marginalia is a **reading and annotation workflow for the reMarkable 2**, and it
-must run **on the device itself** — no Mac/PC required, no permanent local
-process, no Marginalia server. The device owns its database, search index,
-cached library metadata, downloaded documents, annotations, notes, tags, journal
-and recovery state.
+That sentence is the whole product, and it is narrower than the one this
+document used to describe. Two findings narrowed it, both from a device rather
+than from reasoning:
 
-**Where reading material comes from is a plug-in concern.** A `LibraryProvider`
-supplies source-neutral items; a folder of documents needs no network at all,
-and Zotero is the richest source implemented. The workflow above the port does
-not know which it is reading. Internet is needed only by sources that inherently
-require it.
+1. **There is no way to draw on the screen** without modifying software that
+   belongs to reMarkable. So there is no Marginalia interface on the device.
+   The native reader is the interface, and it is untouched.
+   ([ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md), which now also
+   covers the binary-patching route and why it is refused rather than
+   impossible.)
+2. **Highlighted text is stored as text**, in
+   `<uuid>.highlights/<page>.json` — not buried in stroke geometry, as the desk
+   research had feared. Reading it is reading a JSON file.
+   ([HARDWARE_VALIDATION.md](docs/remarkable/HARDWARE_VALIDATION.md))
 
-The desktop application stays in the same monorepo and becomes an **optional
-companion and power mode**. No essential RM2 workflow may depend on it.
+The first removed a class of features permanently. The second removed the
+project's largest risk. What is left is one loop, and everything below serves
+it:
 
-> ✅ **ADR-002 is decided: option D.** The evidence
-> ([`ECOSYSTEM.md`](docs/remarkable/ECOSYSTEM.md)) shows there is no way to draw
-> to a reMarkable 2 screen without injecting a library into a system process.
-> Marginalia therefore has **no on-device UI**: it is a headless agent, and the
-> native reader is the interface. What the user sees are generated documents;
-> what the user asks for is a stylus tick on one
-> ([ADR-006](docs/adr/ADR-006-on-device-interaction.md)).
->
-> ⚠ **Phase 5 needs re-scoping.** The same research found firmware 3.x changed
-> annotation storage and that quotable highlight text may not be recoverable at
-> all on current firmware. See U3.
+```
+read and highlight        extract              review              keep
+in the native reader  →   what the device  →   as documents   →   as Markdown,
+(unchanged)               already stored       and digests         or in Zotero
+```
 
-Phases are sequential. A phase does not start while a previous phase has failing
-tests or unresolved safety regressions. Phase 0 is the validated baseline and is
-not to be rewritten wholesale.
+**Where documents come from is a plug-in concern.** A `LibraryProvider` supplies
+source-neutral items; a folder needs no network, and Zotero is the richest
+source implemented. Nothing above the port knows which is in use. Zotero is not
+what this tool is for; it is one place documents can come from.
 
-Every phase ends with: unit and integration tests; lint and typecheck;
-architecture/dependency tests; the complete safety suite; simulator and
-fault-injection tests; documentation, ADRs, capability matrix and this roadmap
-updated; and a review proving desktop is not a hidden runtime dependency of an
-RM2-essential feature.
+## Kept and excluded
 
-Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked/unknown
+The full reasoning is in the README. In short:
+
+**Kept** — the on-device agent; highlight extraction; persistence with history;
+Markdown and JSON export; generated review documents; explicit document
+transfer; library sources as ports; the safety model, capability matrix and
+one-command removal; the request form.
+
+**Excluded permanently** — any Marginalia interface on the device (split view,
+sidebar, overlays, a command palette on a device with no keyboard); patching
+`xochitl`; writing tags into the device's own metadata; annotating original PDFs
+on the device; OCR; a package manager or system service; cloud sync of
+Marginalia's data; and any automatic file transfer.
+
+**Removed 2026-08-13** — the Tauri desktop application. Six screens of mock
+interface wired to nothing, which had never once built, costing two CI jobs. The
+terminal interface (`apps/tui`) replaces it, and it does what that app never
+did: install, check, configure and remove, by driving the tools that already
+exist.
 
 ## Non-negotiable safety invariants
 
@@ -267,86 +277,95 @@ simulated fault.
 
 **Exit:** we can describe the device accurately and cannot write to it at all.
 
-## Phase 5 — Local highlights extraction ☐
+## Phase 5 — Highlights ◐ (reading done)
 
-⚠ Gated additionally on **U15**: ADR-001 chose PDFium for a desktop target and
-there is no obvious prebuilt armv7 binary.
+The phase this project was most afraid of, and the one hardware made small.
 
+- ☑ Highlight ingest, read-only, from `<uuid>.highlights/<page>.json`
+- ☑ Page numbering for `.content` formatVersion 1 **and** 2, with an unverified
+  version refused rather than guessed
+- ☑ `marginalia highlights` — list, show, export Markdown, emit JSON
+- ☑ Verified on hardware: 26 documents, 2,624 highlights, nothing written
+- ☐ Persist highlights with `extraction_version`, so a format correction can be
+  re-run instead of silently disagreeing with older rows
+- ☐ History: what changed since the last extraction
+- ☐ Handwritten strokes via a versioned `.rm` v6 parser — text from strokes is
+  a separate question and may never be answered
 
-Gated on U3, U7, U8, U10.
+**Dropped from this phase.** Highlight↔text intersection, coordinate mapping and
+PDF text extraction with geometry: all were needed only if the text had to be
+recovered from stroke geometry. It does not. PDFium on armv7 (U15) is no longer
+on the critical path.
 
-- ☐ Annotation file ingest (read-only)
-- ☐ `.rm` parsing behind a versioned parser with honest failure
-- ☐ Coordinate mapping, round-trip property tests
-- ☐ PDF text extraction with geometry (`pdfium-render`)
-- ☐ Highlight↔text intersection, reading order, context capture
-- ☐ Highlight model, storage, Highlight view UI
-- ☐ Derived annotated PDF export — flag `native_pdf_annotations`, default OFF
-- ☐ Safety test S6; original-immutability property test on every fixture
+**Exit:** highlights are stored with provenance and survive a format change;
+originals are provably byte-identical.
 
-**Exit:** highlights become text with provenance; originals are provably
-byte-identical.
+## Phase 6 — Review documents ☐
 
-## Phase 6 — Autonomous Annotation Inbox ☐
+The first thing Marginalia puts on the screen — by writing a document the native
+reader opens, which is the only screen it will ever have.
 
-- ☐ Unified annotation projection + inbox UI
-- ☐ Filters (kind, type, date, document, author, collection, tag, year)
-- ☐ Actions: open source, copy, edit, tag, send to Zotero, archive
-- ☐ Source navigation (document → page → position)
-- ☐ Zotero export path
+- ☐ A digest per document: your highlights, in reading order, with pages
+- ☐ A library index listing what has been highlighted and when
+- ☐ Generated into your library only when asked, never silently
+- ☐ Regeneration is idempotent: no duplicate documents accumulating
+- ☐ Removal takes the generated documents with it
 
-## Phase 7 — Resource-bounded local search ☐
+## Phase 7 — The request form ☐
 
-- ☐ FTS5 index over PDF text, highlights, notes, Zotero metadata
-- ☐ `SearchQueryParser`, `SearchRanker`, facets
+[ADR-006](docs/adr/ADR-006-on-device-interaction.md). The only way to ask for
+something on a device with no interface: tick a box with the stylus.
+
+- ☐ Generate an index with a tick box per entry
+- ☐ Read ticks back from the annotation layer, generation-scoped and idempotent
+- ☐ An ambiguous mark is never guessed — it is reported and ignored
+- ☐ `FormRequest` → `ExplicitUserIntent`, which is what a transfer requires
+
+## Phase 8 — see Phase 3
+
+Explicit document transfer is Phase 3 and always was; a second entry here was a
+duplicate produced while reorganising. Phase 7's request form is what supplies
+the `ExplicitUserIntent` that Phase 3 requires, so the two are done in that
+order.
+
+## Phase 9 — Search, within the device's means ☐
+
+- ☐ FTS5 over highlights and library metadata
+- ☐ Results delivered as a generated document, like everything else
 - ☐ Provenance on every result — no result without a source
-- ☐ Incremental reindexing
+- ☐ Incremental reindexing, bounded memory
 
-## Phase 8 — Local side notes and sticky notes ☐
+## Phase 10 — Tags, read-first ☐
 
-- ☐ Side Notes (desktop): anchors, Markdown, highlight links
-- ☐ Sticky Notes (desktop): positioning, overlay rendering
-- ☐ Zotero note/annotation export
-- ☐ No device UI integration, no original-PDF modification
-
-## Phase 9 — Tags and Zotero bridge ☐
-
-- ☐ Zotero ↔ Marginalia tags
-- ☐ Mapping model, normalisation, conflict UI, confirmation requirement
+- ☐ Marginalia tags, and a mapping model with normalisation and conflicts
 - ☐ reMarkable tag **read**
-- ☐ reMarkable tag **write** only if U5 resolves `SUPPORTED`
+- ☐ reMarkable tag **write** only if U5 resolves SUPPORTED — a read-only bridge
+  is an acceptable final answer
 
-## Phase 10 — RM2 command palette and quick switcher ☐
+## Phase 11 — Export to Zotero ☐
 
-- ☐ `CommandRegistry`, `Command`, `CommandContext`, `CommandExecutor`
-- ☐ ⌘K / Ctrl+K, fuzzy search, recents, keyboard-first
-- ☐ Features register their own commands — no god component
+☐ stable export records, preview, explicit send, local outbox, retry,
+idempotency, conflict detection, receipts, safe credential expiry.
 
-## Phase 11 — Direct annotations/notes export to Zotero ☐
+## Phase 12 — Production hardening and release ☐
 
-☐ stable export records, preview, explicit Send, local outbox, retry,
-idempotency, conflict detection, cursors/receipts, safe credential expiry.
+☐ firmware matrix validated with evidence; upgrade and rollback across released
+versions; manifest and partial-install recovery; threat modelling; parser
+fuzzing; long-duration battery, memory and power-loss tests; recovery
+instructions that never require touching kernel, boot or system.
 
-## Phase 12 — Optional desktop companion / power mode ☐
+## Removed from the plan
 
-Desktop becomes an optional client of the same application contracts, not the
-backend. It must be possible to uninstall it indefinitely without disabling any
-essential RM2 workflow.
+Phases that existed because the project once expected a screen it will not get,
+or a desktop application it no longer has.
 
-## Phase 13 — Production hardening and release ☐
-
-☐ firmware matrix validated with evidence; upgrade/rollback across released
-versions; manifest/signature/partial-install recovery; threat modelling; parser
-fuzzing; long-duration battery/memory/power-loss tests; recovery instructions
-that never require touching kernel/boot/system.
-
-## Retired from v1 — optional RM companion
-
-The v1 plan ended with an optional companion *running on the device*. The v2
-product decision makes the device the primary runtime, so this phase no longer
-exists as written. What survives of it is the constraint set: anything that
-ever runs on the device must be isolated, removable, must not replace
-`xochitl`, must not patch system files, and must not affect boot or updates.
+| Was | Why it is gone |
+|---|---|
+| Annotation Inbox with filters and actions | It was an inbox **UI**. What survives is Phase 6: the same information, as a document. |
+| Side notes and sticky notes with overlay rendering | Overlays need the display. |
+| Command palette and quick switcher (⌘K, "keyboard-first") | The reMarkable has no keyboard and no interface Marginalia may reach. This one had been sitting in the plan long after ADR-002 made it impossible. |
+| Optional desktop companion / power mode | The Tauri app is deleted; `apps/tui` is the companion, and it runs in a terminal. |
+| Derived annotated PDF export on the device | A PDF stack on armv7 to reproduce text that is already text. Markdown export does the job. |
 
 ## Non-goals
 

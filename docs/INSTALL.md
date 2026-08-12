@@ -18,10 +18,10 @@ A complete, step-by-step guide to getting Marginalia running on your machine.
 1. [What you need](#1-what-you-need)
 2. [Install the prerequisites](#2-install-the-prerequisites)
 3. [Get the code](#3-get-the-code)
-4. [Verify the core (no Node needed)](#4-verify-the-core-no-node-needed)
-5. [Run the desktop app](#5-run-the-desktop-app)
+4. [Verify the core](#4-verify-the-core)
+5. [Run the terminal interface](#5-run-the-terminal-interface)
 5b. [Connect your Zotero library](#5b-connect-your-zotero-library)
-6. [Build a distributable app](#6-build-a-distributable-app)
+6. [Build the agent for your reMarkable](#6-build-the-agent-for-your-remarkable)
 7. [Everyday commands](#7-everyday-commands)
 8. [Project layout](#8-project-layout)
 9. [Troubleshooting](#9-troubleshooting)
@@ -33,9 +33,7 @@ A complete, step-by-step guide to getting Marginalia running on your machine.
 
 | Tool | Minimum | Why |
 |---|---|---|
-| **Rust** | 1.77+ | 1.77 is required by Tauri 2. The core crates alone build on 1.68+. |
-| **Node.js** | 20.10+ | Required by Vite 5 and the Tauri CLI. |
-| **pnpm** | 9+ | The workspace uses pnpm workspaces. |
+| **Rust** | see `rust-toolchain.toml` | rustup installs the pinned version for you on first build. |
 | **Git** | any recent | To clone the repository. |
 | **A C compiler** | platform default | SQLite is compiled from source (`rusqlite` bundled). |
 
@@ -59,19 +57,14 @@ xcode-select --install
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Then install Node 20+ and pnpm. If you use [nvm](https://github.com/nvm-sh/nvm):
 
-```bash
-nvm install 20 && nvm use 20 && corepack enable && corepack prepare pnpm@9 --activate
-```
-
-Tauri needs no extra system packages on macOS beyond the Xcode command line
+Nothing else is needed on macOS beyond the Xcode command line
 tools.
 
 ### Linux (Debian / Ubuntu)
 
 ```bash
-sudo apt update && sudo apt install -y build-essential curl file libssl-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+sudo apt update && sudo apt install -y build-essential curl file libssl-dev pkg-config
 ```
 
 ```bash
@@ -79,32 +72,24 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ```bash
-nvm install 20 && nvm use 20 && corepack enable && corepack prepare pnpm@9 --activate
 ```
 
-On Fedora, the WebKit package is `webkit2gtk4.1-devel`; on Arch, `webkit2gtk-4.1`.
 
 ### Windows
 
 1. Install [Rust](https://rustup.rs) (the installer will offer to install the
    Visual Studio C++ Build Tools — accept).
-2. Install [Node.js 20 LTS](https://nodejs.org).
-3. Enable pnpm:
 
-```bash
-corepack enable && corepack prepare pnpm@9 --activate
-```
-
-WebView2 ships with Windows 10/11. If it is missing, install the
-[Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
 
 ### Check your versions
 
 ```bash
-rustc --version && node --version && pnpm --version
+rustc --version
 ```
 
-You want Rust ≥ 1.77, Node ≥ 20.10, pnpm ≥ 9. If any is older, see
+`rust-toolchain.toml` pins the version this project is tested against, and
+rustup installs it for you on the first build — so a mismatch here is not a
+problem. If something goes wrong anyway, see
 [Troubleshooting](#9-troubleshooting).
 
 ---
@@ -115,15 +100,9 @@ You want Rust ≥ 1.77, Node ≥ 20.10, pnpm ≥ 9. If any is older, see
 git clone https://github.com/cyuss/marginalia.git && cd marginalia
 ```
 
-Install the JavaScript dependencies:
-
-```bash
-pnpm install
-```
-
 ---
 
-## 4. Verify the core (no Node needed)
+## 4. Verify the core
 
 This is the fastest way to confirm your setup, and it is where the interesting
 part of the project lives. It needs only Rust.
@@ -147,25 +126,27 @@ prohibited operation is refused no matter how the app is configured.
 
 ---
 
-## 5. Run the desktop app
+## 5. Run the terminal interface
 
 ```bash
-pnpm dev
+make tui
 ```
 
-This starts Vite and launches the Tauri window. The first run compiles the Rust
-side and takes several minutes; later runs are fast, and the UI hot-reloads.
+This is where you install Marginalia on a reMarkable, check it, configure a
+library source, and remove it again — without memorising commands.
 
-To work on the interface alone, in a normal browser at
-`http://localhost:1420`:
+It is a front door, not a second implementation: every entry runs one of the
+scripts in `tools/device/` or the agent over SSH, and the command it will run is
+shown on screen before you press enter. Anything touching the device hands the
+terminal back to you, so you answer the password prompt and type your own
+confirmations. Nothing here answers a safety question on your behalf.
 
-```bash
-pnpm dev:web
-```
+Press `h` to set your device's address. `q` quits.
 
-What you will see: the application shell — Library, Annotation Inbox, Zotero,
-Device, Activity and Settings — with honest empty states. There is no mock
-data. The Device screen states plainly what Marginalia may and may not do.
+> There is no graphical application, and no Marginalia interface on the
+> reMarkable itself. That is a decision, not a gap —
+> [ADR-002](adr/ADR-002-remarkable-ui-and-runtime.md) explains what was
+> considered and why it was refused.
 
 ---
 
@@ -260,38 +241,33 @@ explicit-library path. Without any variables the live tests skip and say why.
   `<redacted>` in every format, including debug output, so a careless log line
   cannot leak it.
 
-## 6. Build a distributable app
+## 6. Build the agent for your reMarkable
 
 ```bash
-pnpm build
+make build-device-docker    # needs only Docker
+make verify-device-binary   # runs that ARM binary under emulation
 ```
 
-Output lands in `apps/desktop/src-tauri/target/release/bundle/`:
-
-- macOS — `.app` and `.dmg`
-- Windows — `.msi` and `.exe`
-- Linux — `.deb`, `.rpm` and `.AppImage`
-
-Builds are unsigned. Signing and notarisation are a release concern, not a
-development one.
+The result is a single static-ish ARM binary of about 4 MB. `make device-install`
+(or the terminal interface) is what puts it on a device.
 
 ---
 
 ## 7. Everyday commands
 
 ```bash
-pnpm dev            # run the desktop app
-pnpm dev:web        # run the UI only, in a browser
-pnpm build          # build a distributable app
-pnpm test           # the full Rust test suite
-pnpm test:safety    # the safety suite alone
-pnpm typecheck      # TypeScript, strict
-pnpm lint           # ESLint
-pnpm check          # everything above, in order
-cargo fmt --all     # format Rust
+make tui            # the terminal interface
+make test           # the full test suite
+make test-safety    # the safety suite alone
+make test-arch      # dependency-direction and forbidden-import rules
+make lint           # clippy, warnings denied
+make fmt            # format
+make check          # everything CI runs, in order
+make device         # what you can do to a connected reMarkable
 ```
 
-Run `pnpm check` before opening a pull request.
+Run `make check` before opening a pull request. Every recipe exists in both
+`make` and `just`, under the same name.
 
 ---
 
@@ -299,14 +275,18 @@ Run `pnpm check` before opening a pull request.
 
 ```
 marginalia/
-├── apps/desktop/            Tauri 2 shell — React UI + Rust binary
-│   └── src-tauri/           its own Cargo workspace (needs newer Rust)
+├── apps/
+│   ├── remarkable/          the on-device agent — this is the product
+│   └── tui/                 the terminal interface, on your computer
 │
 ├── packages/
 │   ├── core/                domain model, state machines — depends on nothing
 │   ├── safety/              SafetyManager, WriteGrant, flags, snapshots
 │   ├── database/            SQLite, migrations, repositories
 │   ├── remarkable/          device port + firmware compatibility matrix
+│   ├── annotations/         reads the highlights the device already stored
+│   ├── zotero/              a LibraryProvider
+│   ├── library-folder/      a LibraryProvider that needs no network
 │   └── observability/       structured logging, SAFETY audit channel
 │
 ├── tests/
@@ -316,24 +296,16 @@ marginalia/
 └── docs/                    architecture, safety model, open questions
 ```
 
-Two Cargo workspaces, deliberately. The root workspace holds the core crates
-and builds on a modest toolchain; `apps/desktop/src-tauri` is separate because
-Tauri 2 needs a much newer Rust. You can work on the entire domain and safety
-layer with `cargo test` alone.
+One workspace, one toolchain, no JavaScript. There was a second workspace for a
+Tauri desktop shell; it was removed in August 2026, having never built. You can
+work on the entire domain and safety layer with `cargo test` alone, and you
+never need a device.
 
 ---
 
 ## 9. Troubleshooting
 
-### `pnpm` fails with `URL.canParse is not a function`
-
-Your Node is older than 20. Corepack's pnpm shim needs Node 20+.
-
-```bash
-nvm install 20 && nvm use 20 && corepack prepare pnpm@9 --activate
-```
-
-### `cargo build` fails in `apps/desktop/src-tauri` with an edition or feature error
+### `cargo build` fails with an edition or feature error
 
 Your Rust is older than 1.77.
 
@@ -341,20 +313,14 @@ Your Rust is older than 1.77.
 rustup update stable
 ```
 
-The core crates still build and test on 1.68 — run `cargo test --workspace`
-from the repository root, which does not include the Tauri app.
+`rust-toolchain.toml` pins the version, and rustup installs it automatically —
+`cargo test --workspace` from the repository root should simply work.
 
 ### `linker cc not found` / `error: linker not found`
 
 Install a C toolchain: `xcode-select --install` on macOS, `build-essential` on
 Debian/Ubuntu, the Visual Studio C++ Build Tools on Windows. SQLite is compiled
 from source.
-
-### Tauri fails on Linux with a missing `webkit2gtk` package
-
-Install the development packages listed in
-[§2](#2-install-the-prerequisites). The package name varies by distribution;
-on newer distributions it is the `4.1` variant.
 
 ### The first build seems stuck
 
@@ -365,17 +331,11 @@ progress:
 cargo build --workspace --verbose
 ```
 
-### Tests pass but the app window is blank
-
-Check that Vite is serving on port 1420, and look at the terminal running
-`pnpm dev` for a TypeScript error. The Tauri window loads
-`http://localhost:1420` in development.
-
 ### Where is my data?
 
 Marginalia stores a local SQLite database and nothing else. There is no
-account, no server, no telemetry. Once Phase 1 lands, the database path is
-shown in Settings.
+account, no server, no telemetry. On a device it lives in
+`/home/root/.marginalia`, and `marginalia status` prints the path.
 
 ---
 

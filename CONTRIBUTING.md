@@ -22,21 +22,21 @@ They are not background reading — they are the rules.
 ## Setup
 
 ```bash
-pnpm install
-pnpm dev
+make setup
+make tui
 ```
 
-Requires Node 20+, pnpm 9+, Rust stable, and the Tauri 2 prerequisites for your
-platform. **A reMarkable device is not required** — development uses the
-simulator.
+Requires Rust (the version in `rust-toolchain.toml`, installed automatically)
+and Docker for device builds. No Node, no JavaScript, no bundler.
+**A reMarkable device is not required** — development uses the simulator.
 
 ## Testing
 
 ```bash
-pnpm test          # unit + integration
-pnpm test:safety   # safety suite — never skip, never mark flaky
-pnpm test:e2e
-pnpm lint && pnpm typecheck
+make test          # the whole suite
+make test-safety   # safety suite — never skip, never mark flaky
+make test-arch     # dependency-direction and forbidden-import rules
+make lint && make fmt-check
 ```
 
 A PR with a failing or skipped safety test is not merged. If a safety test is

@@ -9,8 +9,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # The core workspace: domain, safety, database, simulator. No Tauri, no Node,
-  # so this job is fast and is the gate that matters most.
+  # Everything: domain, safety, database, agent, terminal interface, simulator.
+  # One workspace and no JavaScript, so this is fast and is the gate that
+  # matters most. The Tauri desktop shell and its two jobs are gone -- it was
+  # mock screens wired to nothing and had never built.
   core:
     name: Core (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -132,61 +134,3 @@ jobs:
             echo "::error::A reference to prohibited device territory appeared outside a comment."
             exit 1
           fi
-
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # No `version:` here on purpose. package.json already declares
-      # "packageManager": "pnpm@9.12.0", and action-setup fails outright when
-      # given a second, independent source of truth. The manifest wins, so the
-      # version developers use locally is the version CI uses.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm --filter @marginalia/desktop exec vite build
-
-  # The Tauri shell is its own workspace with a much heavier toolchain, so it
-  # builds separately and does not slow down the gate above.
-  desktop:
-    name: Desktop build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install the pinned toolchain
-        # Pinned to bash so this step reads the same on every runner. A bare
-        # `run:` is PowerShell on windows-latest, which has no `sed` -- that is
-        # what broke the Windows leg of the matrix while Linux and macOS passed.
-        shell: bash
-        run: |
-          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
-          echo "rust-toolchain.toml pins $toolchain"
-          rustup toolchain install "$toolchain" --component rustfmt --component clippy
-          rustup default "$toolchain"
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/desktop/src-tauri
-      # No `version:` here on purpose. package.json already declares
-      # "packageManager": "pnpm@9.12.0", and action-setup fails outright when
-      # given a second, independent source of truth. The manifest wins, so the
-      # version developers use locally is the version CI uses.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: System dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build

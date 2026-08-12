@@ -23,11 +23,11 @@ PORTABLE  := -p marginalia-core -p marginalia-safety -p marginalia-observability
 AGENT_DEV_HOME := $(HOME)/.marginalia-dev
 
 # Every target that produces no file of its own.
-.PHONY: help setup setup-rust setup-node setup-cross \
-        dev dev-web agent agent-init \
+.PHONY: help setup setup-rust setup-cross \
+        tui agent agent-init \
         check test test-safety test-arch test-characterization test-device-faults \
-        test-zotero-live lint fmt fmt-check typecheck \
-        build cross-check build-device build-device-docker verify-device-binary build-desktop \
+        test-zotero-live lint fmt fmt-check \
+        build cross-check build-device build-device-docker verify-device-binary \
         device device-doctor device-install-dry device-install device-status \
         device-check device-reset-dry device-reset \
         clean docs stats
@@ -46,18 +46,14 @@ help:
 ##@ Setup
 
 ## setup: everything needed to build and test — run once
-setup: setup-rust setup-node
+setup: setup-rust
 	@echo ""
-	@echo "Ready. Try: make check"
+	@echo "Ready. Try: make tui"
 
 ## setup-rust: Rust toolchain plus the reMarkable's ARM target
 setup-rust:
 	rustup target add $(RM_TARGET)
 	@echo "Rust ready ($$(rustc --version))"
-
-## setup-node: JavaScript dependencies (needs Node 20+)
-setup-node:
-	pnpm install
 
 ## setup-cross: install `cross`, which builds for the device (needs Docker)
 setup-cross:
@@ -65,13 +61,9 @@ setup-cross:
 
 ##@ Develop
 
-## dev: run the desktop companion
-dev:
-	pnpm dev
-
-## dev-web: run only the interface, at http://localhost:1420
-dev-web:
-	pnpm dev:web
+## tui: the terminal interface — install, check, configure, remove
+tui:
+	cargo run -q -p marginalia-tui
 
 ## agent: run the on-device agent locally — make agent ARGS=doctor
 agent: ARGS ?= status
@@ -125,10 +117,6 @@ fmt:
 fmt-check:
 	cargo fmt --all -- --check
 
-## typecheck: TypeScript, strict
-typecheck:
-	pnpm typecheck
-
 ##@ Build
 
 ## build: release build of everything that builds here
@@ -163,10 +151,6 @@ verify-device-binary:
 	   -v "$(PWD)/target/device/$(RM_TARGET)/release":/x:ro \
 	   -e MARGINALIA_HOME=/data/.marginalia \
 	   debian:bookworm-slim bash -c '/x/marginalia init && /x/marginalia doctor'
-
-## build-desktop: build the desktop companion for distribution
-build-desktop:
-	pnpm build
 
 ##@ Device — everything below talks to a connected reMarkable
 
@@ -214,7 +198,6 @@ device-reset:
 ## clean: remove build artefacts
 clean:
 	cargo clean
-	rm -rf apps/desktop/dist apps/desktop/node_modules node_modules
 
 ## docs: the documents worth reading first
 docs:

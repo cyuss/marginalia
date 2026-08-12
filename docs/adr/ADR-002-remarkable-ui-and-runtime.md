@@ -82,6 +82,45 @@ Load a shim into `xochitl`; render through it.
   invariants 4 and 9.
 - ➖ Inherits every compatibility risk of the launcher.
 
+### E — Patch `xochitl` itself (the approach `ddvk/remarkable-hacks` takes)
+
+Added 2026-08-13, after the question "but how did *that* project put things on
+the screen?" — a fair question this ADR had failed to answer, because it
+considered only the framebuffer shim and not the older, more direct route.
+
+[`ddvk/remarkable-hacks`](https://github.com/ddvk/remarkable-hacks) (1,770
+stars) modifies the bytes of the proprietary `xochitl` binary in `/usr/bin`,
+backing the original up under `/home/rmhacks/`. It genuinely adds items to the
+native interface — that is not a trick, it is the real thing, and the reason it
+works is that it is editing the application itself.
+
+It has to be said plainly: **this route is not impossible, and never was.** It
+is excluded, which is a different claim.
+
+- ➖ Invariant 1, in the most literal sense available: patching `xochitl`.
+- ➖ Invariant 8: it writes into `/usr/bin`, a system directory.
+- ➖ Its patches are keyed to an **exact firmware build**, not a release line.
+  The repository's patch set runs from `2141866` to `21511189` — firmware
+  2.15.1.1189 — and there is nothing for a 3.x device. The device this project
+  was validated against runs **3.28.0.166**.
+- ➖ Unmaintained in practice: last commit June 2023, last push December 2023.
+  reMarkable's 3.x line arrived after that and nothing followed it.
+- ➖ Every firmware update requires unpatching first and a new patch afterwards,
+  produced by someone re-reverse-engineering the new binary.
+- ➖ Its own README states that using it violates the reMarkable EULA, and warns
+  of crashes and data loss.
+
+So there are two independent reasons not to take this route, and they should not
+be confused with each other. The first is that it would break the promise that
+makes Marginalia worth installing — that is the reason that would still hold
+even if the patches were current. The second is simply that they are not: for a
+device on 3.28, this option is not on the table at all today.
+
+Anyone who wants patched-in interface elements should install
+`remarkable-hacks` deliberately, understanding what it does. It is a different
+bargain, honestly offered. Marginalia is not that bargain, and cannot become it
+without becoming a different project.
+
 ### D — No custom UI: a headless agent, with the native reader as the interface
 
 reMarkFlow runs on the device as a bounded, user-startable background service
@@ -121,10 +160,20 @@ Zotero  ──sync──►  reMarkFlow agent  ──generates──►  "Librar
 and generated documents are what the user sees.
 
 This is not the cautious choice among several. A and C require injecting a
-library into a system process, and B requires display access that no documented
-route provides without the same injection. **Every alternative is unavailable
-to a project holding invariants 1, 2 and 4** — so the decision is what remains,
-not what was preferred.
+library into a system process, B requires display access that no documented
+route provides without the same injection, and E edits the bytes of `xochitl`.
+
+The distinction matters and is easy to blur: drawing on a reMarkable's screen
+from third-party code **is possible** — E has done it for years and has 1,770
+stars to show for it. What is unavailable is a way to do it that leaves the
+device's own software untouched. Every known route modifies something that
+belongs to reMarkable, and invariants 1, 2 and 4 exist precisely to say that
+Marginalia does not do that. So the decision is what remains **after a promise
+is kept**, not what remains after the physics.
+
+That framing is deliberate, because the honest version is the one a user can
+act on. Someone who wants patched-in menu items is not being told "that cannot
+be done"; they are being told this project will not be the thing that does it.
 
 Option D's one real weakness, having no way for the user to express a
 per-document request, was closed by [ADR-006](./ADR-006-on-device-interaction.md):

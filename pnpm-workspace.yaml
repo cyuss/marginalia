@@ -1,5 +1,0 @@
-packages:
-  - "apps/*"
-  - "packages/ui"
-  - "packages/shared-types"
-  - "features/*"

@@ -1,0 +1,14 @@
+[package]
+name = "marginalia-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The terminal interface. Runs on your computer and drives the agent on the device."
+
+[[bin]]
+name = "marginalia-tui"
+path = "src/main.rs"
+
+[dependencies]
+ratatui.workspace = true
+crossterm.workspace = true

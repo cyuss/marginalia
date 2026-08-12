@@ -21,9 +21,19 @@ promises never to do. The full reasoning is in
 [ADR-002](adr/ADR-002-remarkable-ui-and-runtime.md); the evidence is in
 [ECOSYSTEM.md](remarkable/ECOSYSTEM.md) §2.
 
-So a split view is not on the roadmap. Not "later" — the only known way to
-build it requires breaking the guarantee that makes this project worth
-installing.
+There is one more route, and it deserves a straight answer because people do
+ask: [`ddvk/remarkable-hacks`](https://github.com/ddvk/remarkable-hacks) really
+does add items to the native interface, by **editing the bytes of the `xochitl`
+binary**. So this is possible. It is refused here rather than impossible — the
+promise that Marginalia leaves your device's software alone is the reason it is
+safe to install, and a version that patched `xochitl` would be a different
+program making a different promise.
+
+(Separately: that project's patches stop at firmware 2.15.1.1189 and its last
+commit was June 2023, so a device on 3.x has nothing to apply. Its own README
+notes that using it violates the reMarkable EULA.)
+
+So a split view is not on the roadmap.
 
 **What you get instead.** The reMarkable's own reader is the interface. You read
 and highlight exactly as you do now, with nothing in the way. Marginalia works
@@ -34,6 +44,25 @@ things ([ADR-006](adr/ADR-006-on-device-interaction.md)).
 
 That constraint turns out to be a decent product. Nothing to learn, nothing to
 launch, nothing that can crash your reader.
+
+---
+
+## The short way: the terminal interface
+
+```bash
+make tui
+```
+
+Install, check, configure a library source, read your highlights, remove
+everything — without memorising a command. It shows you the command each entry
+will run before you press enter, and hands the terminal back to you whenever
+something needs an answer, so you type your own password and your own
+confirmations.
+
+It runs on your computer. There is no Marginalia interface on the reMarkable
+itself, and there will not be — see the first section above.
+
+Everything below is what the interface runs, if you would rather type it.
 
 ---
 
@@ -162,12 +191,12 @@ a device with 3814 documents and verified before and after.
 
 | | |
 |---|---|
-| Highlights into a database, with history | Phase 4 |
+| Highlights in a database, with history | Phase 5 |
 | Reading digests generated as documents in your library | Phase 6 |
 | Asking for things by ticking a generated index with the stylus | Phase 7 ([ADR-006](adr/ADR-006-on-device-interaction.md)) |
 | Sending a document to the device, explicitly | Phase 3 |
 | Handwritten margin notes, not just highlights | needs the `.rm` v6 stroke parser |
-| Tag bridging with the device's own tags | Phase 8 |
+| Tag bridging with the device's own tags | Phase 10, read-first |
 
 Handwritten notes are a harder problem than highlights: highlighted text is
 stored as text, but handwriting is stroke geometry. It will arrive as strokes

@@ -22,20 +22,15 @@ default:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Everything needed to build and test. Run once.
-setup: setup-rust setup-node
+setup: setup-rust
     @echo ""
-    @echo "Ready. Try: just check"
+    @echo "Ready. Try: just tui"
 
 # Rust toolchain plus the reMarkable's ARM target.
 setup-rust:
     rustup target add {{RM_TARGET}}
     @echo "Rust ready ($(rustc --version))"
 
-# JavaScript dependencies for the desktop companion (needs Node 20+).
-setup-node:
-    # If this fails with URL.canParse, your Node is too old:
-    #   nvm install 20 && nvm use 20 && corepack prepare pnpm@9 --activate
-    pnpm install
 
 # Install `cross`, which builds the agent for the device (needs Docker).
 setup-cross:
@@ -45,13 +40,9 @@ setup-cross:
 # Develop
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Run the desktop companion (Tauri window).
-dev:
-    pnpm dev
-
-# Run only the interface, in a browser at http://localhost:1420.
-dev-web:
-    pnpm dev:web
+# The terminal interface: install, check, configure, remove.
+tui:
+    cargo run -q -p marginalia-tui
 
 # Run the on-device agent locally — `just agent doctor`.
 agent *ARGS="status":
@@ -109,10 +100,6 @@ fmt:
 fmt-check:
     cargo fmt --all -- --check
 
-# TypeScript, strict.
-typecheck:
-    pnpm typecheck
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Build
 # ─────────────────────────────────────────────────────────────────────────────
@@ -156,10 +143,6 @@ verify-device-binary:
       -v "$PWD/target/device/{{RM_TARGET}}/release":/x:ro \
       -e MARGINALIA_HOME=/data/.marginalia \
       debian:bookworm-slim bash -c '/x/marginalia init && /x/marginalia doctor'
-
-# Build the desktop companion for distribution.
-build-desktop:
-    pnpm build
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Device — everything below talks to a connected reMarkable
@@ -211,7 +194,6 @@ device-reset:
 # Remove build artefacts.
 clean:
     cargo clean
-    rm -rf apps/desktop/dist apps/desktop/node_modules node_modules
 
 # The documents worth reading first.
 docs:
