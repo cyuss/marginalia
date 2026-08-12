@@ -65,11 +65,33 @@ Usable parser: [`remarkable_lines`](https://docs.rs/remarkable_lines) — Rust,
 **MIT**, v3–v6, self-described as partly guesswork. Licence-compatible, worth a
 spike behind our own versioned adapter. `remarks` is GPL-3.0: reference only.
 
-**Resolution.** Inspect real annotation files from a throwaway highlighted PDF;
-build fixtures; then design the extractor. Extraction stays versioned
-(`extraction_version`) so a format change can be re-run rather than corrupting
-stored data. An unknown version must fail honestly rather than produce a
-plausible-looking misreading.
+**Answered 2026-08-12 — on hardware, reMarkable 2 running 3.28.0.166. See
+[`HARDWARE_VALIDATION.md`](../remarkable/HARDWARE_VALIDATION.md) §2.**
+
+The pessimistic branch does not apply. Highlighted text is stored as text,
+beside the document, in `<uuid>.highlights/<page-uuid>.json` — one object per
+highlight carrying `text`, `color`, `start`, `length` and `rects`. 27 such
+directories were present on the device. Stroke files are `.rm` version 6.
+
+So Phase 4 reads a JSON file. No OCR, no rasterising, no engine intersecting
+stroke geometry with a PDF text layer, and no need to fall back to a highlight
+that reports a region without daring to quote. The desk research that raised
+this question was reasoning about tooling that had stopped being maintained, not
+about the format.
+
+`remarkable_lines` (Rust, MIT, v3–v6) remains the candidate for *strokes* —
+handwritten margin notes still need it. It is no longer on the critical path for
+highlights.
+
+**What is still open.** Whether this layout is stable across firmware releases;
+how it differs for EPUB versus PDF; what a highlight spanning a page break looks
+like. `AnnotationRead` stays `UNKNOWN` in the matrix until something reads these
+files and is validated doing it — knowing a format is not implementing it.
+
+**Resolution.** Build fixtures from a throwaway highlighted PDF, then the
+extractor. Extraction stays versioned (`extraction_version`) so a format change
+can be re-run rather than corrupting stored data. An unknown version must fail
+honestly rather than produce a plausible-looking misreading.
 
 ## U4 — Zotero local database access (blocks Phase 1 completion)
 
@@ -145,7 +167,7 @@ and non-A4 pages.
 |---|---|---|---|
 | U1 | open | — | ADR-006 (pending) |
 | U2 | open | — | — |
-| U3 | open — **severity raised** | — | see ECOSYSTEM.md §3 |
+| U3 | **answered** — text is stored as JSON | 2026-08-12 | [HARDWARE_VALIDATION.md](../remarkable/HARDWARE_VALIDATION.md) §2 |
 | U4 | open | — | — |
 | U5 | open | — | — |
 | U6 | open | — | — |
@@ -193,6 +215,16 @@ Whether WAL is safe and performant on the device's storage, and whether
 `synchronous = FULL` is warranted given unannounced power loss. Until measured,
 the device profile defaults to the durable option. See
 [ADR-005](../adr/ADR-005-device-storage-profile.md).
+
+**Partially answered 2026-08-12.** The device profile was applied on real device
+storage for the first time: the database opened on ext4 (`/dev/mmcblk2p4`) in
+journal mode `delete` at schema v2, and the profile's refusal to accept a
+substituted journal mode was not triggered. Peak RSS for a full open-and-report
+was 13.2 MB.
+
+Still unmeasured, and the part that actually matters: durability under
+unannounced power loss, and whether WAL would be faster enough to be worth
+arguing about. The default stays the durable one.
 
 ## U13 — Application persistence across firmware updates
 

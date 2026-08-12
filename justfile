@@ -217,7 +217,7 @@ clean:
 docs:
     @echo "  README.md                                    what this is"
     @echo "  docs/INSTALL.md                              install on your computer"
-    @echo "  docs/remarkable/INSTALL_ON_DEVICE.md         install on your reMarkable"
+    @echo "  docs/INSTALL_REMARKABLE.md                   install on your reMarkable"
     @echo "  ROADMAP.md                                   what is built and what is next"
     @echo ""
     @echo "  docs/architecture/ARCHITECTURE.md            the design"
@@ -225,6 +225,7 @@ docs:
     @echo "  docs/safety/DEVICE_WRITE_POLICY.md           exactly what may be written"
     @echo "  docs/adr/                                    decisions, including the open ones"
     @echo "  docs/development/OPEN_QUESTIONS.md           what is still unknown"
+    @echo "  docs/remarkable/HARDWARE_VALIDATION.md       what a real device did"
 
 # Count what exists, for a sense of scale.
 stats:

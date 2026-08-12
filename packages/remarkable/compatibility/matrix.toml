@@ -14,13 +14,53 @@
 #    docs/remarkable/COMPATIBILITY_MODEL.md §6, and the validation write-up
 #    must land in the same pull request.
 #
+# 4. Entries are matched in file order and the FIRST match wins. Version-
+#    specific entries must therefore appear above the `3.x` defaults, or they
+#    will never be reached. `the_specific_entry_wins_over_the_general_one` in
+#    compatibility.rs holds this in place.
+#
 # ── Current state ───────────────────────────────────────────────────────────
 #
-# Nothing has been validated on hardware yet. Every capability below is
-# therefore UNKNOWN, which means Marginalia can currently do nothing to a
-# device at all. That is the correct state for Phase 0.
+# Two read capabilities have been validated on a reMarkable 2 running
+# 3.28.0.166. Everything else is UNKNOWN, which means Marginalia can do nothing
+# else to a device at all.
 #
-# See docs/development/OPEN_QUESTIONS.md — U1, U2, U3, U5, U6.
+# See docs/remarkable/HARDWARE_VALIDATION.md for what was run and observed, and
+# docs/development/OPEN_QUESTIONS.md — U1, U2, U5, U6.
+
+# ── Validated on hardware — RM2 / 3.28.0.166 ────────────────────────────────
+#
+# These two are the only capabilities exercised end-to-end by doctor.sh and
+# install.sh, which is why they are the only two leaving UNKNOWN. Neither
+# writes anything: one reads identity, the other reads free space. Marking a
+# capability SUPPORTED because a shell command worked once is exactly the
+# optimism rule 1 exists to stop -- the difference here is that the command
+# these entries describe IS the implementation, and it ran against a device.
+
+[[entry]]
+model = "RM2"
+firmware = "3.28"
+capability = "DeviceInfoRead"
+status = "SUPPORTED"
+tested_at = "2026-08-12"
+method = "hardware"
+notes = """
+Read model, kernel and firmware from a device over SSH. The release is
+3.28.0.166, from /usr/share/remarkable/update.conf; /etc/version holds a build
+timestamp (20260806095513) and must not be read as a version.
+"""
+
+[[entry]]
+model = "RM2"
+firmware = "3.28"
+capability = "StorageRead"
+status = "SUPPORTED"
+tested_at = "2026-08-12"
+method = "hardware"
+notes = """
+`df -k /home` on the device, parsed by install.sh's storage check. Reported
+1090 MB free of 6.4 GB. Note BusyBox coreutils: `tail -n 1`, never `tail -1`.
+"""
 
 # ── Reads ───────────────────────────────────────────────────────────────────
 
@@ -67,7 +107,16 @@ capability = "AnnotationRead"
 status = "UNKNOWN"
 tested_at = ""
 method = "tbd"
-notes = "Phase 4. Blocked on OPEN_QUESTIONS U2 and U3."
+notes = """
+Phase 4. Still UNKNOWN, and deliberately so: U3 is answered but nothing reads
+these files yet, and a format we have merely looked at is not a capability.
+
+What hardware showed on 3.28.0.166: highlighted text is NOT buried in the
+stroke data. It sits beside the document as <uuid>.highlights/<page>.json, one
+object per highlight carrying `text`, `color`, `start`, `length` and `rects`.
+27 such directories were present. Stroke files are `.rm` version 6.
+See docs/remarkable/HARDWARE_VALIDATION.md.
+"""
 
 # ── Writes — the four whitelisted operations ────────────────────────────────
 

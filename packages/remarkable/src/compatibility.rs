@@ -133,19 +133,70 @@ mod tests {
     #[test]
     fn the_bundled_matrix_grants_no_writes_yet() {
         let m = CompatibilityMatrix::bundled();
-        let firmware = fw("3.11.2");
-        for capability in [
-            Capability::SafeDocumentTransfer,
-            Capability::DocumentRemoval,
-            Capability::NativeTagsWrite,
-            Capability::PdfAnnotationExport,
-        ] {
-            let status = m.resolve(DeviceKind::Rm2, &firmware, capability);
-            assert!(
-                !status.permits_write(),
-                "{capability:?} must not permit writes until validated on hardware"
-            );
+        // 3.28.0.166 is included because that is what the hardware runs. Adding
+        // validated read entries for it must not have opened a write anywhere.
+        for firmware in [fw("3.11.2"), fw("3.28.0.166")] {
+            for capability in [
+                Capability::SafeDocumentTransfer,
+                Capability::DocumentRemoval,
+                Capability::NativeTagsWrite,
+                Capability::PdfAnnotationExport,
+            ] {
+                let status = m.resolve(DeviceKind::Rm2, &firmware, capability);
+                assert!(
+                    !status.permits_write(),
+                    "{capability:?} must not permit writes on {} until validated on hardware",
+                    firmware.raw
+                );
+            }
         }
+    }
+
+    /// Resolution returns the first matching entry, so a `3.28` entry only has
+    /// effect while it sits above the `3.x` catch-all. Reordering the file
+    /// would silently strand it -- the lookup would still succeed, just against
+    /// the wrong row -- so the ordering is asserted rather than trusted.
+    #[test]
+    fn the_specific_entry_wins_over_the_general_one() {
+        let m = CompatibilityMatrix::bundled();
+
+        assert_eq!(
+            m.resolve(
+                DeviceKind::Rm2,
+                &fw("3.28.0.166"),
+                Capability::DeviceInfoRead
+            ),
+            CapabilityStatus::Supported,
+            "the validated 3.28 entry must be reached before the 3.x default"
+        );
+
+        // A firmware with no specific entry still falls through to the untested
+        // default, which is UNKNOWN.
+        assert_eq!(
+            m.resolve(DeviceKind::Rm2, &fw("3.11.2"), Capability::DeviceInfoRead),
+            CapabilityStatus::Unknown
+        );
+
+        // Validating one release must not validate its neighbours.
+        assert_eq!(
+            m.resolve(DeviceKind::Rm2, &fw("3.29.0.1"), Capability::DeviceInfoRead),
+            CapabilityStatus::Unknown
+        );
+    }
+
+    /// U3's answer changes what Phase 4 has to build, but not what it is
+    /// allowed to do today. Reading a format is not implementing a capability.
+    #[test]
+    fn knowing_the_highlight_format_did_not_by_itself_grant_annotation_reads() {
+        let m = CompatibilityMatrix::bundled();
+        assert_eq!(
+            m.resolve(
+                DeviceKind::Rm2,
+                &fw("3.28.0.166"),
+                Capability::AnnotationRead
+            ),
+            CapabilityStatus::Unknown
+        );
     }
 
     #[test]
