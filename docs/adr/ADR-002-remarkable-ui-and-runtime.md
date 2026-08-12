@@ -1,6 +1,7 @@
 # ADR-002 — How reMarkFlow presents itself on a reMarkable 2
 
-- **Status:** **OPEN — blocking Phase 1. Decision required from the project lead.**
+- **Status:** **Accepted — option D.** Decided 2026-08-12 on the evidence in
+  [`ECOSYSTEM.md`](../remarkable/ECOSYSTEM.md), not on preference.
 - **Date:** 2026-08-12
 - **Supersedes:** nothing
 - **Related:** invariants 1–4, 9; unknown U11
@@ -28,22 +29,25 @@ These two requirements are in tension, and the tension is not obviously
 resolvable. This ADR exists to make the choice explicit rather than to let an
 implementation quietly pick one.
 
-## What is known and not known
+## What is known
 
-**Not validated on hardware. No reMarkable has been touched.** What follows is
-the state of my knowledge, offered so the decision can be made deliberately —
-not as established fact. Every claim here needs a documented read-only probe
-before it is relied upon.
+Desk research on 2026-08-12 replaced the guesswork this ADR originally
+contained. The findings, with sources, are in
+[`ECOSYSTEM.md`](../remarkable/ECOSYSTEM.md). In short:
 
-The reMarkable 2's display is not exposed to third-party processes as a
-conventional Linux framebuffer in the way earlier hardware was. Community
-projects that render custom full-screen interfaces on this device generally
-depend on a framebuffer shim, which works by loading a server component into
-the running `xochitl` process and having client applications load a matching
-client library.
+- reMarkable's own documentation states there is **no official or supported
+  mechanism** for third-party applications to run on the device or reach the
+  display, and that `xochitl` is proprietary with no source available.
+- The community solution, **rm2fb**, works by `LD_PRELOAD`ing a server into a
+  system binary and `LD_PRELOAD`ing a client shim into each application, which
+  then intercepts `/dev/fb0`.
 
-That mechanism, if it is still how this works, is squarely inside invariants 1
-and 2.
+That mechanism is squarely inside invariants 1, 2 and 4. It is careful work
+solving a problem reMarkable declined to solve — and it is incompatible with
+what this project promised.
+
+**Still not verified on hardware.** These are vendor and community sources read
+from the outside. But they point the same way from every direction examined.
 
 ## Options
 
@@ -113,35 +117,45 @@ Zotero  ──sync──►  reMarkFlow agent  ──generates──►  "Librar
 
 ## Decision
 
-**None yet.** This ADR is deliberately unresolved.
+**Option D.** No custom UI on the device; the native reader is the interface,
+and generated documents are what the user sees.
 
-My recommendation, strengthened since ADR-006: **pursue D as the V1 shape**,
-with a hardware spike to establish whether B is achievable. D's one hole is
-closed, so it is now a complete product shape rather than a partial one. D is
-the only option that does not require relaxing a safety invariant, and the
-invariants were written first and for good reason. If the interaction problem
-in D proves unsolvable, the choice becomes an explicit, documented trade — "we
-relax invariant 1 to get a real UI" — which is a decision the project lead
-should make consciously, in this file, rather than one an implementation makes
-by importing a library.
+This is not the cautious choice among several. A and C require injecting a
+library into a system process, and B requires display access that no documented
+route provides without the same injection. **Every alternative is unavailable
+to a project holding invariants 1, 2 and 4** — so the decision is what remains,
+not what was preferred.
+
+Option D's one real weakness, having no way for the user to express a
+per-document request, was closed by [ADR-006](./ADR-006-on-device-interaction.md):
+a tick box on a generated form, read back from the annotation layer. That needs
+only annotation *reading*, which is GREEN.
+
+If a future firmware or a supported reMarkable API changes the display picture,
+this decision should be revisited on its merits. Relaxing an invariant to get a
+richer UI remains possible, but it would be an explicit, written trade recorded
+here — not something an implementation arrives at by importing a library.
 
 ## Consequences
 
-Until this is decided:
+- **Phase 1 is unblocked**, in the option D shape: a headless agent, not a
+  native shell. `apps/remarkable` exists and is that agent.
+- Capability `ExperimentalRmUi` stays `UNSUPPORTED` permanently, and its
+  feature flag never ships on. It is now unsupported by decision rather than by
+  ignorance.
+- The roadmap's Phase 1 wording ("a small touch/stylus-friendly E-Ink UI") is
+  superseded. The interface is documents; the gesture is a stylus mark.
+- Latency becomes a product property rather than a bug: a request is seen at
+  the next sync. The generated documents must say so.
+- **Phase 5 needs re-scoping.** The same research found that firmware 3.x
+  changed annotation storage and that community tooling has not caught up —
+  quotable highlight text may not be recoverable at all. See
+  [`ECOSYSTEM.md`](../remarkable/ECOSYSTEM.md) §3 and U3.
 
-- Phase 1 (RM2 native shell) cannot start.
-- `apps/remarkable` is not created.
-- Capability `ExperimentalRmUi` stays `UNSUPPORTED`, feature flag OFF.
-- Migration slices 1–9 in the audit report proceed regardless — they are
-  valuable under every option.
+## Still required, but no longer blocking
 
-## Required before this ADR can be closed
-
-1. A documented read-only hardware probe: how a non-`xochitl` process can
-   obtain display access on the target firmware, if at all.
-2. ~~For option D: a design spike on the interaction mechanism.~~ **Done** —
-   [ADR-006](./ADR-006-on-device-interaction.md), with the mark→intent→grant
-   path exercised end to end in
-   `tests/safety/tests/standalone_device.rs::the_device_can_complete_the_essential_workflow_alone`.
-3. Confirmation from the project lead of which invariants, if any, may be
-   relaxed — recorded here, in writing, with the reasoning.
+A hardware probe remains the only way to move any capability off `UNKNOWN`.
+[`DISPLAY_ACCESS_SPIKE.md`](../remarkable/DISPLAY_ACCESS_SPIKE.md) is written
+and ready; its display section is now confirmatory rather than exploratory, and
+its storage, TLS and resource sections are still the cheapest experiments
+available.

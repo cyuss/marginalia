@@ -48,10 +48,28 @@ version, and how stable is it?
 **Why it matters.** It is the difference between "read the text out" and "build
 a geometric text-mapping engine". It changes Phase 4's size by weeks.
 
-**Resolution.** Inspect real annotation files from the user's device on a
-throwaway document; build fixtures; then design the extractor. Extraction is
-versioned (`extraction_version`) so a format change can be re-run rather than
-corrupting stored data.
+**Severity raised 2026-08-12.** Desk research
+([`ECOSYSTEM.md`](../remarkable/ECOSYSTEM.md) §3) found that firmware 3.x
+changed how annotations are stored; the most mature extractor (`remarks`,
+GPL-3.0) states it does not support software ≥ 3.0; and community reports
+suggest no mainstream method exists for recovering highlighted *text* on
+current firmware, with at least one tool rasterising pages to find
+highlight-coloured pixels instead.
+
+A third possibility now has to be planned for, alongside "text is stored" and
+"intersect geometry with the PDF text layer": **the text may not be recoverable
+at all**, and the honest product answer is a highlight that reports its page and
+region without claiming to quote.
+
+Usable parser: [`remarkable_lines`](https://docs.rs/remarkable_lines) — Rust,
+**MIT**, v3–v6, self-described as partly guesswork. Licence-compatible, worth a
+spike behind our own versioned adapter. `remarks` is GPL-3.0: reference only.
+
+**Resolution.** Inspect real annotation files from a throwaway highlighted PDF;
+build fixtures; then design the extractor. Extraction stays versioned
+(`extraction_version`) so a format change can be re-run rather than corrupting
+stored data. An unknown version must fail honestly rather than produce a
+plausible-looking misreading.
 
 ## U4 — Zotero local database access (blocks Phase 1 completion)
 
@@ -127,7 +145,7 @@ and non-A4 pages.
 |---|---|---|---|
 | U1 | open | — | ADR-006 (pending) |
 | U2 | open | — | — |
-| U3 | open | — | — |
+| U3 | open — **severity raised** | — | see ECOSYSTEM.md §3 |
 | U4 | open | — | — |
 | U5 | open | — | — |
 | U6 | open | — | — |
@@ -154,9 +172,20 @@ all. Every route currently known to me collides with a safety invariant; a
 fourth option (no custom UI, native reader as the interface) avoids the problem
 entirely but changes the product shape.
 
-**Resolution.** Documented read-only hardware probe, then
-[ADR-002](../adr/ADR-002-remarkable-ui-and-runtime.md). **Do not resolve this
-by picking the more invasive option.**
+**Answered 2026-08-12 — by desk research, see
+[`ECOSYSTEM.md`](../remarkable/ECOSYSTEM.md) §2.** There is none.
+
+reMarkable's own documentation states there is no official or supported way for
+a third-party application to reach the display. The community route, rm2fb,
+`LD_PRELOAD`s a server into a system binary and a client shim into each
+application. That is invariants 1, 2 and 4.
+
+[ADR-002](../adr/ADR-002-remarkable-ui-and-runtime.md) is therefore decided:
+**option D**, no custom UI, the native reader as the interface. Not the
+cautious choice among several — the only one available.
+
+Reopen if reMarkable ships a supported application story, or a route appears
+that needs no injection.
 
 ## U12 — SQLite journal mode on the device filesystem
 
@@ -221,7 +250,7 @@ unchanged and well understood — `cross`/Docker, or a host cross-gcc.
 
 | ID | Status | Severity | Blocks |
 |---|---|---|---|
-| U11 | open | **blocking** | Phase 1, all UI |
+| U11 | **answered** — no invariant-compatible route exists | — | ADR-002 decided: option D |
 | U12 | open | high | Phase 1 storage |
 | U13 | open | high | Phase 1 packaging |
 | U14 | open | medium | Phase 1 budgets |

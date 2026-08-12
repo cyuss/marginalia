@@ -21,13 +21,17 @@ is needed only for operations that inherently contact Zotero.
 The desktop application stays in the same monorepo and becomes an **optional
 companion and power mode**. No essential RM2 workflow may depend on it.
 
-> ⚠ **Phase 1 is blocked.** The Phase 0.5 audit found that the on-device UI
-> requirement may be unsatisfiable alongside safety invariants 1–4. See
-> [ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md) and
-> [the audit report](docs/migration/phase-0-to-standalone-rm2.md) §6.
-> A decision is required before Phase 1 work begins. **Chosen route: gather
-> evidence first** — see the read-only
-> [hardware spike protocol](docs/remarkable/DISPLAY_ACCESS_SPIKE.md).
+> ✅ **ADR-002 is decided: option D.** The evidence
+> ([`ECOSYSTEM.md`](docs/remarkable/ECOSYSTEM.md)) shows there is no way to draw
+> to a reMarkable 2 screen without injecting a library into a system process.
+> Marginalia therefore has **no on-device UI**: it is a headless agent, and the
+> native reader is the interface. What the user sees are generated documents;
+> what the user asks for is a stylus tick on one
+> ([ADR-006](docs/adr/ADR-006-on-device-interaction.md)).
+>
+> ⚠ **Phase 5 needs re-scoping.** The same research found firmware 3.x changed
+> annotation storage and that quotable highlight text may not be recoverable at
+> all on current firmware. See U3.
 
 Phases are sequential. A phase does not start while a previous phase has failing
 tests or unresolved safety regressions. Phase 0 is the validated baseline and is
@@ -119,11 +123,15 @@ real device; not modifying any Phase 0 production code.
 cross-compiles and passes simulator packaging/install/uninstall/rollback tests;
 audit report approved; **ADR-002 decided**.
 
-## Phase 1 — RM2 native shell, local storage, and Safe Mode ⚠ BLOCKED
+## Phase 1 — RM2 agent, local storage, and Safe Mode ◐
 
-Blocked on [ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md) (U11).
+Unblocked by ADR-002. The shape is a headless agent, not a native shell.
 
-- ⚠ E-Ink UI with explicit refresh policy — shape depends entirely on ADR-002
+- ☑ the agent binary, with a startup guard refusing any home outside its own
+- ☑ device-profile storage: rollback journal, `synchronous = FULL`
+- ☑ `status` / `init` / `doctor`, reporting what it may and may never do
+- ☑ manifest-based install, and a reset that verifies the device is back to stock
+- ☐ ~~E-Ink UI with explicit refresh policy~~ **superseded**: no UI, by decision
 - ☐ local navigation, empty/loading/error/offline states, persistent Safe Mode indicator
 - ☐ Marginalia-owned SQLite with a measured journal mode (U12)
 - ☐ crash-safe migrations, activity journal, storage reserve, corruption recovery
