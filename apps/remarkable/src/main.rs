@@ -27,6 +27,9 @@ use marginalia_database::StorageProfile;
 use marginalia_platform::FileCredentialStore;
 use marginalia_safety::{FeatureFlag, FeatureFlagManager};
 
+#[cfg(feature = "network")]
+mod zotero_cmd;
+
 /// Everything the agent owns lives under here. One directory, removable in one
 /// command, listed in the install manifest.
 const DEFAULT_HOME: &str = "/home/root/.marginalia";
@@ -57,6 +60,46 @@ fn main() -> ExitCode {
         "status" => status(&home),
         "init" => init(&home),
         "doctor" => doctor(&home),
+
+        #[cfg(feature = "network")]
+        "sync" => zotero_cmd::sync(&home, marginalia_core::sync::JobTrigger::User),
+
+        #[cfg(feature = "network")]
+        "zotero" => match args.get(1).map(String::as_str) {
+            Some("connect") => match args.get(2) {
+                Some(key) => zotero_cmd::connect(&home, key.clone()),
+                None => {
+                    eprintln!("usage: marginalia zotero connect <api-key>");
+                    eprintln!("Create one at https://www.zotero.org/settings/keys");
+                    ExitCode::from(64)
+                }
+            },
+            Some("use") => match args.get(2) {
+                Some(id) => zotero_cmd::use_library(
+                    &home,
+                    id,
+                    args.get(3).map(String::as_str) == Some("--group"),
+                ),
+                None => {
+                    eprintln!("usage: marginalia zotero use <library-id> [--group]");
+                    ExitCode::from(64)
+                }
+            },
+            Some("disconnect") => zotero_cmd::disconnect(&home),
+            _ => {
+                eprintln!("usage: marginalia zotero <connect|use|disconnect>");
+                ExitCode::from(64)
+            }
+        },
+
+        #[cfg(not(feature = "network"))]
+        "sync" | "zotero" => {
+            eprintln!(
+                "This build has no network support, so it cannot reach Zotero.\n\
+                 Rebuild with:  cargo build -p marginalia-agent --features network"
+            );
+            ExitCode::from(69)
+        }
         "version" | "--version" | "-V" => {
             println!("marginalia {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
@@ -86,6 +129,15 @@ COMMANDS
     doctor     check this installation, changing nothing
     version    print the version
     help       this text
+
+  Zotero (builds with --features network)
+    zotero connect <api-key>    connect a library; the ID is discovered for you
+    zotero use <id> [--group]   pick a library, when the key reaches several
+    zotero disconnect           forget the key here (does NOT revoke it at Zotero)
+    sync                        bring the metadata up to date
+
+  Syncing brings titles, authors, collections, tags and which attachments
+  exist. It never moves a PDF: that is a separate, explicit request.
 
 ENVIRONMENT
     MARGINALIA_HOME    where the agent keeps everything (default {DEFAULT_HOME})

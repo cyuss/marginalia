@@ -15,6 +15,7 @@
 use marginalia_core::secret::Redacted;
 
 use crate::credentials::ZoteroCredentials;
+use crate::sync::{ItemPage, RemoteItem, SyncCursor};
 use crate::{KeyDescription, KeyVerification, LibraryAccess, ZoteroClient, ZoteroError};
 
 const API_BASE: &str = "https://api.zotero.org";
@@ -166,6 +167,115 @@ impl ZoteroClient for HttpZoteroClient {
             Err(ureq::Error::Transport(t)) => Err(map_transport(&t)),
         }
     }
+
+    fn fetch_items(
+        &self,
+        credentials: &ZoteroCredentials,
+        cursor: &SyncCursor,
+        start: u32,
+        limit: u32,
+    ) -> Result<ItemPage, ZoteroError> {
+        let url = format!("{}{}", self.base_url, cursor.query(start, limit));
+
+        let response = self
+            .agent()
+            .get(&url)
+            .set("Zotero-API-Version", API_VERSION)
+            .set(
+                "Authorization",
+                &format!("Bearer {}", credentials.api_key().expose_secret()),
+            )
+            .call();
+
+        match response {
+            Ok(res) => {
+                // The server decides where the next page begins; it is the only
+                // party that can be right about that.
+                let library_version = res
+                    .header("Last-Modified-Version")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(cursor.last_version);
+                let next_start = next_start_from_link(res.header("Link"));
+
+                let body: serde_json::Value = res
+                    .into_json()
+                    .map_err(|_| ZoteroError::Protocol("item page was not JSON".into()))?;
+                let array = body
+                    .as_array()
+                    .ok_or_else(|| ZoteroError::Protocol("item page was not a list".into()))?;
+
+                Ok(ItemPage {
+                    items: array.iter().filter_map(parse_item).collect(),
+                    library_version,
+                    next_start,
+                })
+            }
+            Err(ureq::Error::Status(code, res)) => Err(match code {
+                401 => ZoteroError::Unauthorized,
+                403 => ZoteroError::Forbidden,
+                404 => ZoteroError::LibraryNotFound,
+                429 | 503 => ZoteroError::RateLimited {
+                    retry_after_secs: res
+                        .header("Retry-After")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(60),
+                },
+                other => ZoteroError::Protocol(format!("status {other}")),
+            }),
+            Err(ureq::Error::Transport(t)) => Err(map_transport(&t)),
+        }
+    }
+}
+
+/// Extract the `start` offset of the `rel="next"` link, if there is one.
+///
+/// Zotero paginates with a `Link` header. Parsing the offset out of it, rather
+/// than counting items ourselves, means the server decides where the next page
+/// begins — which is the only party that can be right about it.
+fn next_start_from_link(link_header: Option<&str>) -> Option<u32> {
+    let header = link_header?;
+    for part in header.split(',') {
+        if !part.contains("rel=\"next\"") {
+            continue;
+        }
+        let url = part.split('<').nth(1)?.split('>').next()?;
+        for pair in url.split(['?', '&']) {
+            if let Some(value) = pair.strip_prefix("start=") {
+                return value.parse().ok();
+            }
+        }
+    }
+    None
+}
+
+/// Turn one item's JSON into the metadata we keep.
+///
+/// Tolerant by design: an item we cannot fully understand still has a key and
+/// a version, which is enough to record that it exists. Refusing the whole page
+/// over one unfamiliar field would make a Zotero schema addition an outage.
+fn parse_item(value: &serde_json::Value) -> Option<RemoteItem> {
+    let data = value.get("data")?;
+    let key = data.get("key").and_then(|v| v.as_str())?;
+    let version = data.get("version").and_then(|v| v.as_i64()).unwrap_or(0);
+    let item_type = data
+        .get("itemType")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let is_pdf_attachment = item_type == "attachment"
+        && data.get("contentType").and_then(|v| v.as_str()) == Some("application/pdf");
+
+    Some(RemoteItem {
+        key: marginalia_core::ids::ZoteroKey::from_string(key),
+        version,
+        item_type,
+        is_pdf_attachment,
+        // Whether the file is on this machine is a local question, answered by
+        // a `stat` elsewhere. The API cannot tell us, and guessing would put a
+        // wrong "PDF available" in front of the user.
+        availability: marginalia_core::zotero::AttachmentAvailability::Unknown,
+    })
 }
 
 /// The failure kind, never the detail: transport error text can contain the
@@ -356,6 +466,67 @@ mod tests {
             parse_key_description(&body),
             Err(ZoteroError::Protocol(_))
         ));
+    }
+
+    #[test]
+    fn the_next_page_offset_comes_from_the_server() {
+        let header = "<https://api.zotero.org/users/1/items?start=50&limit=50>; rel=\"next\",                       <https://api.zotero.org/users/1/items?start=900&limit=50>; rel=\"last\"";
+        assert_eq!(next_start_from_link(Some(header)), Some(50));
+    }
+
+    #[test]
+    fn a_last_page_reports_no_next_offset() {
+        let header = "<https://api.zotero.org/users/1/items?start=0&limit=50>; rel=\"first\"";
+        assert_eq!(next_start_from_link(Some(header)), None);
+        assert_eq!(next_start_from_link(None), None);
+    }
+
+    #[test]
+    fn an_item_becomes_metadata_and_nothing_else() {
+        let value = serde_json::json!({
+            "data": { "key": "ABCD1234", "version": 42, "itemType": "journalArticle" }
+        });
+        let item = parse_item(&value).unwrap();
+
+        assert_eq!(item.key.as_str(), "ABCD1234");
+        assert_eq!(item.version, 42);
+        assert!(!item.is_pdf_attachment);
+    }
+
+    #[test]
+    fn a_pdf_attachment_is_recognised_without_being_fetched() {
+        let value = serde_json::json!({
+            "data": {
+                "key": "FILE0001", "version": 7,
+                "itemType": "attachment", "contentType": "application/pdf"
+            }
+        });
+        let item = parse_item(&value).unwrap();
+
+        assert!(item.is_pdf_attachment);
+        assert_eq!(
+            item.availability,
+            marginalia_core::zotero::AttachmentAvailability::Unknown,
+            "whether the file is here is a local question; guessing would put a \
+             wrong 'PDF available' in front of the user"
+        );
+    }
+
+    #[test]
+    fn an_unfamiliar_item_still_records_that_it_exists() {
+        // A Zotero schema addition must be a display gap, not an outage.
+        let value = serde_json::json!({
+            "data": { "key": "NEW00001", "version": 9, "somethingNew": true }
+        });
+        let item = parse_item(&value).unwrap();
+        assert_eq!(item.key.as_str(), "NEW00001");
+        assert_eq!(item.item_type, "unknown");
+    }
+
+    #[test]
+    fn an_item_without_a_key_is_skipped_not_fatal() {
+        assert!(parse_item(&serde_json::json!({ "data": { "version": 1 } })).is_none());
+        assert!(parse_item(&serde_json::json!({})).is_none());
     }
 
     #[test]

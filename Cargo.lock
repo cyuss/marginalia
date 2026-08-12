@@ -487,6 +487,8 @@ dependencies = [
  "marginalia-platform",
  "marginalia-remarkable",
  "marginalia-safety",
+ "marginalia-sync",
+ "marginalia-zotero",
  "serde_json",
  "tracing",
 ]
@@ -610,6 +612,19 @@ dependencies = [
  "marginalia-database",
  "marginalia-remarkable",
  "marginalia-safety",
+]
+
+[[package]]
+name = "marginalia-sync"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "marginalia-core",
+ "marginalia-database",
+ "marginalia-zotero",
+ "rusqlite",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]

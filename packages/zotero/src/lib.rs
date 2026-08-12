@@ -171,6 +171,19 @@ pub trait ZoteroClient {
         &self,
         api_key: &marginalia_core::secret::Redacted<String>,
     ) -> Result<KeyDescription, ZoteroError>;
+
+    /// Fetch one page of items changed since the cursor's version.
+    ///
+    /// Returns **metadata**. [`sync::ItemPage`] has nowhere for file bytes to
+    /// live, so no implementation of this trait can download a PDF while
+    /// pretending to sync.
+    fn fetch_items(
+        &self,
+        credentials: &ZoteroCredentials,
+        cursor: &sync::SyncCursor,
+        start: u32,
+        limit: u32,
+    ) -> Result<sync::ItemPage, ZoteroError>;
 }
 
 #[cfg(test)]

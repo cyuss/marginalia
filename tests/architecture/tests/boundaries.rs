@@ -29,6 +29,7 @@ const PORTABLE_CRATES: &[&str] = &[
     "marginalia-remarkable",
     "marginalia-platform",
     "marginalia-zotero",
+    "marginalia-sync",
 ];
 
 /// Adapters: the layer whose *job* is to know about a host.
@@ -122,6 +123,19 @@ fn allowed_internal_deps() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     m.insert(
         "marginalia-zotero",
         ["marginalia-core"].into_iter().collect(),
+    );
+    // The application layer: it composes adapters and owns no rules of its own.
+    // Created when a real seam appeared -- two collaborators that must not know
+    // about each other, and a consumer that must not know about either.
+    m.insert(
+        "marginalia-sync",
+        [
+            "marginalia-core",
+            "marginalia-database",
+            "marginalia-zotero",
+        ]
+        .into_iter()
+        .collect(),
     );
 
     // Test-only crates may depend on anything they are testing.

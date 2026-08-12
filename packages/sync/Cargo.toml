@@ -1,0 +1,17 @@
+[package]
+name = "marginalia-sync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The sync use case: composes the Zotero planner, the database applier and the journal."
+
+[dependencies]
+marginalia-core.workspace = true
+marginalia-database.workspace = true
+marginalia-zotero.workspace = true
+rusqlite.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+chrono.workspace = true

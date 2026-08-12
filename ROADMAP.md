@@ -143,7 +143,7 @@ Unblocked by ADR-002. The shape is a headless agent, not a native shell.
 **Exit:** the app runs locally with Wi-Fi and desktop absent; owns and recovers
 its data; uninstalls cleanly; writes no native/system path.
 
-## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐
+## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐ (nearly done)
 
 Progress so far, all portable and hardware-free:
 
@@ -163,9 +163,17 @@ Progress so far, all portable and hardware-free:
       crash between the final page and the final commit costs a re-fetch and
       never data
 - ☑ migration 0002 `zotero_sync_state`, with a forward-migration test
-- ☐ the journal
+- ☑ the journal: jobs, operations, and `already_done` so a replayed request
+      is a no-op rather than a second download
+- ☑ `SyncRunner` (`packages/sync`): the page loop, with the cursor moved last
+      and only once
+- ☑ `fetch_items` over HTTP: server-driven pagination from the `Link` header,
+      tolerant item parsing so a Zotero schema addition is a display gap and
+      not an outage
+- ☑ the agent: `zotero connect` / `use` / `disconnect` and `sync`, behind a
+      `network` feature (off by default while U16 is open)
 - ☐ collections and tags
-- ☐ the agent exposing `sync` and the Zotero setup command
+- ☐ collections and tags in the plan
 - ☐ TLS on the device (U16)
 
 The v1 desktop-side plan below is superseded in target but not in substance:

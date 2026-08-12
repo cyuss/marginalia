@@ -9,6 +9,12 @@ description = "The on-device agent. Headless: it owns a directory, a database, a
 name = "marginalia"
 path = "src/main.rs"
 
+[features]
+default = []
+# Talking to Zotero. Off by default while TLS on armv7 is unresolved (U16), so
+# the agent still builds for the device without it.
+network = ["dep:marginalia-zotero", "dep:marginalia-sync", "marginalia-zotero/http"]
+
 [dependencies]
 marginalia-core.workspace = true
 marginalia-safety.workspace = true
@@ -16,6 +22,8 @@ marginalia-database.workspace = true
 marginalia-platform.workspace = true
 marginalia-remarkable.workspace = true
 marginalia-observability.workspace = true
+marginalia-zotero = { workspace = true, optional = true }
+marginalia-sync = { workspace = true, optional = true }
 serde_json.workspace = true
 chrono.workspace = true
 tracing.workspace = true

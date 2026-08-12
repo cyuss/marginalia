@@ -10,6 +10,7 @@
 //! and a battery-powered device that can lose power mid-write. See
 //! `docs/adr/ADR-005-device-storage-profile.md`.
 
+pub mod journal;
 pub mod migrations;
 pub mod repositories;
 pub mod sync_apply;

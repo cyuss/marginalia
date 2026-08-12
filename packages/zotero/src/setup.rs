@@ -266,6 +266,16 @@ mod tests {
                 .take()
                 .unwrap_or(Err(ZoteroError::Unauthorized))
         }
+
+        fn fetch_items(
+            &self,
+            _c: &ZoteroCredentials,
+            _cursor: &crate::sync::SyncCursor,
+            _start: u32,
+            _limit: u32,
+        ) -> Result<crate::sync::ItemPage, ZoteroError> {
+            unreachable!("setup never fetches items")
+        }
     }
 
     fn describing_key(
