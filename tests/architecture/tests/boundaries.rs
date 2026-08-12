@@ -30,6 +30,7 @@ const PORTABLE_CRATES: &[&str] = &[
     "marginalia-platform",
     "marginalia-zotero",
     "marginalia-sync",
+    "marginalia-library-folder",
 ];
 
 /// Adapters: the layer whose *job* is to know about a host.
@@ -38,7 +39,11 @@ const PORTABLE_CRATES: &[&str] = &[
 /// dependencies, but `#[cfg(unix)]` is legitimate here — that is the whole
 /// point of an adapter. Everywhere else it is a platform assumption leaking
 /// into logic that should not have one.
-const ADAPTER_CRATES: &[&str] = &["marginalia-platform", "marginalia-zotero"];
+const ADAPTER_CRATES: &[&str] = &[
+    "marginalia-platform",
+    "marginalia-zotero",
+    "marginalia-library-folder",
+];
 
 /// Crates where a platform branch is a defect: domain and application logic.
 fn is_platform_agnostic(name: &str) -> bool {
@@ -122,6 +127,11 @@ fn allowed_internal_deps() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     );
     m.insert(
         "marginalia-zotero",
+        ["marginalia-core"].into_iter().collect(),
+    );
+    // A second LibraryProvider, which is what keeps the port honest.
+    m.insert(
+        "marginalia-library-folder",
         ["marginalia-core"].into_iter().collect(),
     );
     // The application layer: it composes adapters and owns no rules of its own.

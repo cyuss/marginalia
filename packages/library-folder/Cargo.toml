@@ -1,0 +1,10 @@
+[package]
+name = "marginalia-library-folder"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A folder of documents as a library source. No network, works on the device."
+
+[dependencies]
+marginalia-core.workspace = true
+chrono.workspace = true

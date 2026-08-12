@@ -7,17 +7,23 @@ Last updated: 2026-08-12
 
 ## 1. What Marginalia is
 
-Marginalia is a **local-first desktop application** that connects a Zotero
-research library to a stock reMarkable 2, and brings the resulting highlights
-and handwritten annotations back into a searchable, Zotero-linked knowledge
-layer.
-
-It is **not** a reMarkable replacement, a reMarkable modification, or a Zotero
-replacement. It is the missing layer between them:
+Marginalia is a **reading and annotation workflow for a stock reMarkable 2**.
+It gives documents an identity, turns highlights and handwritten notes into
+something retrievable, and makes the whole lot searchable — without changing
+anything about the device.
 
 ```
-Library → Reading → Annotation → Knowledge → Zotero
+Library → Reading → Annotation → Knowledge
 ```
+
+**Where the library comes from is a detail, deliberately.** A
+`LibraryProvider` supplies source-neutral `LibraryItem`s; a folder of documents
+and a Zotero library are two implementations of it, and nothing above the port
+knows which it is talking to. Zotero is the richest source and the first built.
+It is not the product, and the architecture is arranged so that stays true.
+
+It is **not** a reMarkable replacement, a reMarkable modification, or a
+reference-manager replacement.
 
 ## 2. The three invariants
 
@@ -91,7 +97,8 @@ marginalia/
 │   ├── core/                     domain entities, state machines, errors
 │   ├── database/                 SQLite access, migrations, repositories
 │   ├── safety/                   SafetyManager, classification, snapshots
-│   ├── zotero/                   ZoteroAdapter + sync engine
+│   ├── zotero/                   a LibraryProvider + its sync engine
+│   ├── library-folder/           a LibraryProvider over a directory
 │   ├── remarkable/               DeviceProvider, capabilities, compat matrix
 │   ├── annotations/              .rm parsing, highlight geometry, extraction
 │   ├── pdf/                      text extraction, geometry, derived PDFs

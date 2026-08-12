@@ -544,6 +544,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "marginalia-library-folder"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "marginalia-core",
+]
+
+[[package]]
 name = "marginalia-observability"
 version = "0.1.0"
 dependencies = [

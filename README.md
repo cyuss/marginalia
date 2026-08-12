@@ -4,10 +4,10 @@
 
 <br>
 
-**A local-first research companion that runs _on_ your reMarkable 2.**
+**A reading and annotation workflow that runs _on_ your reMarkable 2.**
 
-Your Zotero library, readable on the device. Your highlights and handwritten
-notes, back in your bibliography. Your reMarkable, completely untouched.
+Know what you are reading. Find what you highlighted. Keep your reMarkable
+exactly as it is.
 
 [Why](#why) · [How it works](#how-it-works) · [Install](docs/INSTALL.md) ·
 [Architecture](docs/architecture/ARCHITECTURE.md) ·
@@ -21,10 +21,11 @@ notes, back in your bibliography. Your reMarkable, completely untouched.
 
 > ### Status — early, and honest about it
 >
-> **Works, and is covered by 310 tests:** the domain and safety layers, local
-> storage, the device simulator, incremental Zotero metadata sync, and an agent
-> that cross-compiles for the reMarkable 2 and **runs** — verified under
-> emulation, including reaching the live Zotero API over TLS.
+> **Works, and is covered by 349 tests:** the domain and safety layers, local
+> storage, the device simulator, two library sources (a folder, and Zotero with
+> incremental sync), and an agent that cross-compiles for the reMarkable 2 and
+> **runs** — verified under emulation, including reaching the live Zotero API
+> over TLS.
 >
 > **Not done:** no reMarkable has been touched yet. Generating the documents you
 > would actually read is the next phase, and it is
@@ -35,23 +36,43 @@ notes, back in your bibliography. Your reMarkable, completely untouched.
 
 ## Why
 
-If you read research on a reMarkable, you already know the gap.
+The reMarkable is superb at reading and writing. It is not good at *the rest of
+reading* — and that is what Marginalia is for.
 
-The device is superb at reading and writing. It is not a research tool. Papers
-arrive as `attention.pdf` — no author, no year, no journal, no collection. You
-highlight a passage that turns out to matter, and three months later you cannot
-remember which of forty PDFs it was in. Your handwriting lives on the device;
-your bibliography lives in Zotero; nothing joins them.
+Four things go wrong once you have more than a few documents on it:
 
-The existing answers each cost something you should not have to pay:
-
-| Approach | What it costs you |
+| | |
 |---|---|
-| Patch the device's software | The device itself. A firmware update can break your workflow, or worse. |
-| Sync everything automatically | 8 GB filled with papers you never meant to read there. |
-| Do it by hand | The thing you were trying to avoid. |
+| **Documents have no identity** | `attention.pdf` — no author, no year, no venue, no idea which of your projects it belongs to. |
+| **Highlights go nowhere** | You mark a passage that matters. Three months later you cannot remember which of forty documents it was in. |
+| **Nothing is searchable** | Your handwriting and your reading live on the device and stop there. |
+| **Getting things on and off is manual** | Either you do it by hand every time, or a tool fills 8 GB with things you never meant to read there. |
 
-Marginalia takes a fourth path: **add the missing layer, touch nothing else.**
+Marginalia adds the missing layer — **library, reading, annotation,
+knowledge** — and touches nothing else. It has one hard rule: your reMarkable
+stays exactly as the manufacturer shipped it.
+
+### Where your reading comes from
+
+Zotero is the first source implemented, and a good one. It is **not** the
+product.
+
+```mermaid
+flowchart LR
+    Z["Zotero"] --> P
+    F["a folder of PDFs"] --> P
+    D["documents already<br/>on the device"] --> P
+    M["added by hand"] --> P
+    P["LibraryProvider"] --> W["the workflow<br/><i>inbox · search · notes<br/>tags · reading state</i>"]
+
+    style P fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
+    style W fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
+```
+
+Everything above the port works in terms of a source-neutral `LibraryItem`.
+Nothing in the workflow knows what Zotero is — which is why a **folder of PDFs**
+works today with no account, no key and no network, and why other sources can be
+added without touching a line of the workflow.
 
 ## How it works
 
@@ -59,18 +80,18 @@ Marginalia takes a fourth path: **add the missing layer, touch nothing else.**
 
 Three ideas, and the whole design follows from them.
 
-### 1 · Syncing moves knowledge, not files
+### 1 · Knowing about a document is not the same as having it
 
-> **Sync** brings titles, authors, collections, tags, and *which* PDFs exist.
-> **A deliberate request** brings one specific PDF.
+> **Refreshing a source** brings titles, authors, collections, tags, and *which*
+> documents exist. **A deliberate request** brings one specific document.
 
-A sync will never copy a PDF to your device. Not for one paper, not for five
-hundred. You can browse your entire library — every title, author, collection
-and tag — with **zero bytes** on the reMarkable.
+Refreshing will never copy a document onto your device. Not one, not five
+hundred. You can browse your whole library — every title, author, collection and
+tag — with **zero bytes** on the reMarkable.
 
-This is not a promise in a README. `MetadataOperation` is an enum with no
-variant capable of expressing a file transfer, and the sync executor accepts
-only that type. The sentence cannot be written.
+This is not a promise in a README. `LibraryProvider` has no method that returns
+file bytes, and `MetadataOperation` has no variant that can express a transfer.
+The sentence cannot be written.
 
 ### 2 · There is no interface on the device, on purpose
 
@@ -202,9 +223,21 @@ You need **Rust 1.90+**, **Node 20+**, and **Docker** for device builds. You do
 **not** need a reMarkable or a Zotero account to develop — there is a simulator
 and synthetic fixtures.
 
-### Connecting Zotero
+### Adding a source
 
-You need an API key and nothing else — the library ID is discovered from the key.
+**A folder** — no account, no network, nothing to configure:
+
+```bash
+marginalia source add folder /home/root/papers
+```
+
+Filenames are read the way reference managers write them
+(`Vaswani et al. - 2017 - Attention Is All You Need.pdf`), and subdirectories
+become collections. When a filename says nothing, Marginalia claims only a
+title rather than inventing authorship.
+
+**Zotero** — an API key and nothing else; the library ID is discovered from the
+key:
 
 ```bash
 marginalia zotero connect <your-key>
@@ -226,7 +259,8 @@ flowchart TD
         SY["sync<br/><i>the use case</i>"]
     end
     subgraph adapters["adapters"]
-        ZO["zotero"]
+        ZO["zotero<br/><i>a LibraryProvider</i>"]
+        FO["library-folder<br/><i>a LibraryProvider</i>"]
         DB["database"]
         PL["platform"]
         RM["remarkable"]
@@ -238,8 +272,8 @@ flowchart TD
 
     AG --> SY
     DK --> SY
-    SY --> ZO & DB
-    ZO & DB & PL & RM --> CO
+    SY --> ZO & FO & DB
+    ZO & FO & DB & PL & RM --> CO
     RM --> SA
     SA --> CO
 
@@ -255,6 +289,7 @@ the safety rules be tested exhaustively without hardware.
 
 | | |
 |---|---|
+| **Sources** | Zotero · a folder of documents · more behind the same port |
 | **Language** | Rust (portable core) · TypeScript + React (desktop companion) |
 | **Storage** | SQLite — WAL on the desktop, rollback journal and `synchronous=FULL` on the device |
 | **Device target** | `armv7-unknown-linux-gnueabihf`, built in a container |
@@ -324,6 +359,15 @@ room — it shows you what is large and lets you decide.
 Because the alternative was shipping device code before the safety layer that
 constrains it. Everything dangerous is now impossible to express by accident,
 and every remaining unknown is written down rather than guessed at.
+</details>
+
+<details>
+<summary><b>Do I need Zotero?</b></summary>
+
+No. A folder of documents works with no account, no key and no network — the
+workflow sits above a `LibraryProvider` port and does not know which kind of
+source it is reading. Zotero is the richest source implemented, not a
+requirement.
 </details>
 
 <details>

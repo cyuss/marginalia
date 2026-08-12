@@ -17,6 +17,7 @@ pub mod document;
 pub mod error;
 pub mod ids;
 pub mod intent;
+pub mod library;
 pub mod request_form;
 pub mod secret;
 pub mod sync;
@@ -28,6 +29,10 @@ pub use clock::{Clock, FixedClock, SteppingClock, SystemClock, SYSTEM_CLOCK};
 pub use credentials::{CredentialError, CredentialKey, CredentialStore};
 pub use error::{CoreError, IllegalTransition};
 pub use ids::*;
+pub use library::{
+    Author, Identifiers, LibraryError, LibraryItem, LibraryPage, LibraryProvider, LibrarySource,
+    ReadingStatus, SourceInfo, SourceRef,
+};
 pub use request_form::{FormAction, FormRequest, MarkVerdict, RequestForm};
 pub use secret::Redacted;
 
