@@ -196,10 +196,22 @@ reMarkable's own software, and removing that one directory removes it entirely."
 }
 
 /// Refuse to run if home points anywhere that is not ours to write to.
+///
+/// The paths this judges describe a *reMarkable's* filesystem, which is POSIX,
+/// regardless of the machine the check happens to be compiled on. `Path::is_absolute`
+/// answers for the host instead: on Windows it calls `/home/root/.marginalia`
+/// relative, because a Windows absolute path needs a drive letter. That made
+/// the Windows leg of CI fail on the agent's own default home -- a real
+/// disagreement about whose filesystem is being described, not a test quirk.
+///
+/// So a leading `/` counts as absolute here, and a host-absolute path is
+/// accepted too, which keeps `MARGINALIA_HOME=C:\...` working for anyone
+/// developing on Windows. The forbidden-prefix rules below stay POSIX, because
+/// `/usr` and `/etc` are the device's directories, not the developer's.
 fn check_home_is_ours(home: &Path) -> Result<(), String> {
     let path = home.to_string_lossy();
 
-    if !home.is_absolute() {
+    if !home.is_absolute() && !path.starts_with('/') {
         return Err(format!(
             "MARGINALIA_HOME must be an absolute path, got {path}"
         ));
@@ -440,6 +452,19 @@ mod tests {
     fn the_default_home_is_accepted() {
         assert!(check_home_is_ours(Path::new(DEFAULT_HOME)).is_ok());
         assert!(check_home_is_ours(Path::new("/home/root/.marginalia")).is_ok());
+    }
+
+    /// The device's paths are POSIX wherever this is compiled. Judging them by
+    /// the host's rules made a Windows build reject the agent's own default
+    /// home, which is the one path that must always be accepted.
+    #[test]
+    fn a_device_path_is_judged_by_the_devices_rules_not_the_hosts() {
+        assert!(check_home_is_ours(Path::new("/home/root/.marginalia")).is_ok());
+        assert!(check_home_is_ours(Path::new("/usr/lib/marginalia")).is_err());
+
+        // Still relative, on any host.
+        assert!(check_home_is_ours(Path::new("marginalia")).is_err());
+        assert!(check_home_is_ours(Path::new("./marginalia")).is_err());
     }
 
     #[test]
