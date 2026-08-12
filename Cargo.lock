@@ -481,6 +481,7 @@ name = "marginalia-agent"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "libc",
  "marginalia-annotations",
  "marginalia-core",
  "marginalia-database",

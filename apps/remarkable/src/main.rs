@@ -45,7 +45,26 @@ const FORBIDDEN_PREFIXES: &[&str] = &[
     "/usr", "/etc", "/lib", "/bin", "/sbin", "/boot", "/opt", "/var", "/proc", "/sys",
 ];
 
+/// Let a closed pipe end the program quietly, the way every other command does.
+///
+/// Rust ignores `SIGPIPE` at startup and turns the resulting write error into a
+/// panic, so `marginalia highlights | head -n 1` printed a backtrace about
+/// stdout instead of just stopping. Restoring the default handler is what makes
+/// the agent composable with `head`, `grep` and `less` -- which matters more
+/// here than usual, since every interaction with it is over SSH.
+///
+/// Unsafe because it is a raw libc call. It is one syscall, made once, before
+/// anything else runs.
+fn exit_quietly_on_a_closed_pipe() {
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
 fn main() -> ExitCode {
+    exit_quietly_on_a_closed_pipe();
+
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = args.first().map(String::as_str).unwrap_or("status");
 

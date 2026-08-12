@@ -26,5 +26,6 @@ marginalia-observability.workspace = true
 marginalia-zotero = { workspace = true, optional = true }
 marginalia-sync = { workspace = true, optional = true }
 serde_json.workspace = true
+libc.workspace = true
 chrono.workspace = true
 tracing.workspace = true

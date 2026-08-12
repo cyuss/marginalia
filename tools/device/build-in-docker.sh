@@ -57,11 +57,25 @@ info "features ${LABEL}"
 # Linux artefacts) never collides with the host's own target/ tree.
 OUT_DIR="target/device"
 
+# Build artefacts live in a Docker volume, not in the bind-mounted repository.
+#
+# WHY: rustc memory-maps the .rmeta files it has just written. Across macOS's
+# bind mount that mapping is not reliable -- a second build against a populated
+# target directory died with `SIGBUS: access to undefined memory` inside rustc,
+# reproducibly, and the only cure was deleting the whole directory. Keeping the
+# target tree on a Linux-native volume removes the mapping from the equation,
+# and has the side benefit that the cache now survives between builds instead of
+# being thrown away to work around the crash.
+#
+# Only the finished binary crosses back, as a plain copy of one file.
+CACHE_VOLUME="marginalia-armv7-target"
+
 step "Compiling"
 docker run --rm \
   -v "$REPO_ROOT":/work \
+  -v "${CACHE_VOLUME}:/target" \
   -w /work \
-  -e CARGO_TARGET_DIR="/work/${OUT_DIR}" \
+  -e CARGO_TARGET_DIR=/target \
   "$RUST_IMAGE" \
   bash -euc "
     apt-get update -qq
@@ -74,8 +88,9 @@ docker run --rm \
 
     cargo build --release --target ${TARGET} -p marginalia-agent ${FEATURES}
 
-    # Hand the artefacts back to the host user rather than leaving root-owned
-    # files in their repository.
+    # One file back across the bind mount, owned by the user rather than root.
+    mkdir -p /work/${OUT_DIR}/${TARGET}/release
+    cp /target/${TARGET}/release/marginalia /work/${OUT_DIR}/${TARGET}/release/marginalia
     chown -R $(id -u):$(id -g) /work/${OUT_DIR}
   " || die "the build failed" "Nothing was sent to your reMarkable."
 

@@ -205,9 +205,14 @@ everything the current features need.
 The reason is printed for each. Nothing was changed; please open an issue with
 the message.
 
-**The build fails with SIGBUS or a container error** — the ARM build runs in
-Docker. Try `rm -rf target/device` and build again; an interrupted build leaves
-artefacts that crash the next compiler run.
+**The build fails with SIGBUS inside rustc** — this was the container build
+memory-mapping compiler artefacts across the macOS bind mount, and it is fixed:
+the ARM target tree now lives in a Docker volume. If you still see it, clear the
+cache and rebuild:
+
+```bash
+docker volume rm marginalia-armv7-target
+```
 
 ---
 
