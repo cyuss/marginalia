@@ -22,6 +22,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install the pinned toolchain
+        # Pinned to bash so this step reads the same on every runner. A bare
+        # `run:` is PowerShell on windows-latest, which has no `sed` -- that is
+        # what broke the Windows leg of the matrix while Linux and macOS passed.
+        shell: bash
         run: |
           toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
           echo "rust-toolchain.toml pins $toolchain"
@@ -54,6 +58,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install the pinned toolchain
+        # Pinned to bash so this step reads the same on every runner. A bare
+        # `run:` is PowerShell on windows-latest, which has no `sed` -- that is
+        # what broke the Windows leg of the matrix while Linux and macOS passed.
+        shell: bash
         run: |
           toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
           echo "rust-toolchain.toml pins $toolchain"
@@ -81,6 +89,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install the pinned toolchain
+        # Pinned to bash so this step reads the same on every runner. A bare
+        # `run:` is PowerShell on windows-latest, which has no `sed` -- that is
+        # what broke the Windows leg of the matrix while Linux and macOS passed.
+        shell: bash
         run: |
           toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
           echo "rust-toolchain.toml pins $toolchain"
@@ -126,9 +138,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here on purpose. package.json already declares
+      # "packageManager": "pnpm@9.12.0", and action-setup fails outright when
+      # given a second, independent source of truth. The manifest wins, so the
+      # version developers use locally is the version CI uses.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -147,6 +161,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install the pinned toolchain
+        # Pinned to bash so this step reads the same on every runner. A bare
+        # `run:` is PowerShell on windows-latest, which has no `sed` -- that is
+        # what broke the Windows leg of the matrix while Linux and macOS passed.
+        shell: bash
         run: |
           toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
           echo "rust-toolchain.toml pins $toolchain"
@@ -155,9 +173,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
+      # No `version:` here on purpose. package.json already declares
+      # "packageManager": "pnpm@9.12.0", and action-setup fails outright when
+      # given a second, independent source of truth. The manifest wins, so the
+      # version developers use locally is the version CI uses.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
