@@ -12,7 +12,7 @@ after that.
 >
 > **What is not:** no reMarkable has been touched. Whether the agent runs on
 > your firmware, and whether an install survives a firmware update, are
-> [U11 and U13](../development/OPEN_QUESTIONS.md) — still open.
+> [U11 and U13](development/OPEN_QUESTIONS.md) — still open.
 >
 > The scripts cannot damage your device's software: everything they write goes
 > into one directory they create, and [`reset.sh`](#removing-it) removes it.
@@ -136,12 +136,12 @@ the next time it syncs and downloads that one. Not the ones above it, not the
 whole collection — the one you ticked.
 
 That is the whole interaction model, and the reasoning is in
-[ADR-006](../adr/ADR-006-on-device-interaction.md). It means Marginalia needs
+[ADR-006](adr/ADR-006-on-device-interaction.md). It means Marginalia needs
 only to *read* your annotations, which is why it can leave the rest of your
 device entirely alone.
 
 > **Not yet built.** Generating those documents is Phase 5 — it needs the PDF
-> layer, which is blocked on [U15](../development/OPEN_QUESTIONS.md). The logic
+> layer, which is blocked on [U15](development/OPEN_QUESTIONS.md). The logic
 > that turns a stylus mark into a request is implemented and tested today, in
 > `marginalia_core::request_form`.
 
@@ -209,7 +209,7 @@ To also revoke the Zotero key you gave it, go back to
 Not yet, and not by accident.
 
 Making the agent start automatically means a startup entry, and
-[the device write policy](../safety/DEVICE_WRITE_POLICY.md) forbids creating
+[the device write policy](safety/DEVICE_WRITE_POLICY.md) forbids creating
 one — that is persistent system configuration, which is exactly the category
 Marginalia promises to stay out of.
 

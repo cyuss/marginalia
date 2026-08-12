@@ -1,6 +1,8 @@
 <div align="center">
 
-# Marginalia
+<img src="docs/assets/wordmark.svg" alt="Marginalia" width="480">
+
+<br>
 
 **A local-first research companion that runs _on_ your reMarkable 2.**
 
@@ -180,7 +182,7 @@ a transfer ever appears.
 ## Install
 
 Full guide: **[docs/INSTALL.md](docs/INSTALL.md)** ·
-On the device: **[docs/remarkable/INSTALL_ON_DEVICE.md](docs/remarkable/INSTALL_ON_DEVICE.md)**
+On the device: **[docs/INSTALL_REMARKABLE.md](docs/INSTALL_REMARKABLE.md)**
 
 ```bash
 git clone https://github.com/cyuss/marginalia.git && cd marginalia

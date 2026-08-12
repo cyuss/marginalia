@@ -34,3 +34,18 @@ Thumbs.db
 .env
 .env.local
 *.secret
+
+# AI assistant context and scratch files. Useful locally, not part of the
+# project — they describe how someone works, not how the software works.
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.claude/
+.cursor/
+.cursorrules
+.aider*
+.windsurfrules
+.github/copilot-instructions.md
+
+# Device build output from the container toolchain.
+/target/device

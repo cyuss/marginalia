@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img"
+     aria-label="Marginalia logo: a page margin rule with a reader's mark beside it.">
+  <title>Marginalia</title>
+  <rect width="256" height="256" rx="56" fill="#F4F2ED"/>
+  <g fill="#1A1917" opacity="0.28">
+    <rect x="112" y="70"  width="86"  height="9" rx="4.5"/>
+    <rect x="112" y="96"  width="74"  height="9" rx="4.5"/>
+    <rect x="112" y="148" width="86"  height="9" rx="4.5"/>
+    <rect x="112" y="174" width="58"  height="9" rx="4.5"/>
+  </g>
+  <rect x="112" y="118" width="86" height="14" rx="7" fill="#2F5D50" opacity="0.28"/>
+  <rect x="70" y="58" width="4" height="140" rx="2" fill="#1A1917" opacity="0.35"/>
+  <path d="M40 122 L52 136 L86 96" fill="none" stroke="#2F5D50" stroke-width="11"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

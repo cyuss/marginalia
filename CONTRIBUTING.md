@@ -65,32 +65,33 @@ requires a change to the Device Write Policy **first**, reviewed on its own.
 
 ## Commit messages
 
-Conventional Commits with a gitmoji prefix:
+Conventional Commits. **No emoji** — the type already says what the emoji
+would, and plain text stays greppable, sortable and readable in every terminal.
 
 ```
-<emoji> <type>[optional scope]: <description>
+<type>[optional scope]: <description>
 
 [optional body]
 
 [optional footer(s)]
 ```
 
-| | Type | For |
-|---|---|---|
-| ✨ | `feat` | a new feature |
-| 🐛 | `fix` | a bug fix |
-| 📚 | `docs` | documentation only |
-| 🎨 | `style` | formatting, no change in meaning |
-| ♻️ | `refactor` | neither fixes a bug nor adds a feature |
-| ⚡️ | `perf` | a performance improvement |
-| 🚨 | `test` | adding or correcting tests |
-| 🔧 | `chore` | build process, tooling, generation |
-| 🚀 | `chore(release)` | deployment or publishing |
-| 🔗 | `chore(deps)` | adding or removing dependencies |
-| 📦️ | `build` | the build itself |
-| 👷 | `ci` | continuous integration |
-| ⚙️ | `config` | configuration files |
-| 🔒️ | `security` | fixing a security issue |
+| Type | For |
+|---|---|
+| `feat` | a new feature |
+| `fix` | a bug fix |
+| `docs` | documentation only |
+| `style` | formatting, no change in meaning |
+| `refactor` | neither fixes a bug nor adds a feature |
+| `perf` | a performance improvement |
+| `test` | adding or correcting tests |
+| `chore` | build process, tooling, generation |
+| `chore(release)` | deployment or publishing |
+| `chore(deps)` | adding or removing dependencies |
+| `build` | the build itself |
+| `ci` | continuous integration |
+| `config` | configuration files |
+| `security` | fixing a security issue |
 
 Scopes follow the crate or area: `core`, `safety`, `db`, `zotero`, `agent`,
 `platform`, `remarkable`, `device`, `install`, `adr`, `readme`.
@@ -101,7 +102,7 @@ prevents. A commit that only restates its diff has wasted the one chance it had
 to explain itself.
 
 ```
-✨ feat(db): apply a sync plan atomically, with a separate watermark
+feat(db): apply a sync plan atomically, with a separate watermark
 
 Applying a page and declaring the library synced are different writes, and the
 cursor moves last. Doing both in one transaction looks tidier and is wrong: it
