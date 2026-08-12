@@ -112,7 +112,7 @@ You want Rust ≥ 1.77, Node ≥ 20.10, pnpm ≥ 9. If any is older, see
 ## 3. Get the code
 
 ```bash
-git clone https://github.com/USER/marginalia.git && cd marginalia
+git clone https://github.com/cyuss/marginalia.git && cd marginalia
 ```
 
 Install the JavaScript dependencies:

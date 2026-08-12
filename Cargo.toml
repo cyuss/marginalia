@@ -33,7 +33,7 @@ exclude = ["apps/desktop/src-tauri"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/USER/marginalia"
+repository = "https://github.com/cyuss/marginalia"
 
 [workspace.dependencies]
 marginalia-core = { path = "packages/core" }

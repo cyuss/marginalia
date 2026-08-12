@@ -15,14 +15,21 @@ handwritten notes back as searchable, citable knowledge.
 
 ---
 
-> ### Status: Phase 0 — foundation
+> ### Status: early, and honest about it
 >
-> The domain model, safety layer, database, device simulator and application
-> shell are implemented and tested. **Zotero and reMarkable connections are not
-> built yet** (Phases 1 and 2). This build contains no device transport code
-> whatsoever and cannot modify a reMarkable.
+> **Works and is tested:** the domain and safety layers, local storage, the
+> device simulator, incremental Zotero metadata sync (paginated, resumable,
+> with tags and collections), and an on-device agent that cross-compiles for
+> the reMarkable 2 and runs — verified under emulation, including reaching the
+> real Zotero API over TLS.
 >
-> Marginalia is being built in public, phase by phase. See [ROADMAP.md](ROADMAP.md).
+> **Not done:** no reMarkable has been touched. Generating the documents you
+> would actually read is the next phase, and it is [not certain that
+> highlighted text can be recovered at all](docs/development/OPEN_QUESTIONS.md)
+> on current firmware.
+>
+> Built in public, phase by phase, with the unknowns written down. See
+> [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -55,6 +62,20 @@ Zotero  ──── metadata ────►  Marginalia  ──── you pres
 
 **Library → Reading → Annotation → Knowledge → Zotero.**
 
+### It has no interface on the device, on purpose
+
+Every known way to draw a custom UI on a reMarkable 2 requires injecting a
+library into a system process. Marginalia refuses to do that, so instead
+**everything it shows you is a document in your library**, rendered by the
+reader you already use.
+
+To ask for a paper, you **tick a box with your stylus** on a generated index.
+Marginalia reads that page on its next sync and fetches the one you ticked. It
+therefore only ever needs to *read* your annotations — which is why it can
+leave the rest of your device completely alone. The reasoning is in
+[ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md) and
+[ADR-006](docs/adr/ADR-006-on-device-interaction.md).
+
 Your reMarkable stays a reMarkable. Handwriting, pen tools, notebooks, PDF
 reading, page navigation, native tags, native search — all of it stays native
 and untouched. Marginalia does not recreate any of it.
@@ -68,10 +89,11 @@ covered by tests that must pass for any change to merge.
 
 Marginalia never patches `xochitl`, never touches the bootloader, kernel or
 system partitions, never replaces system libraries, and never interferes with
-firmware updates. It installs nothing on the device.
+firmware updates. Everything it installs lives in **one directory it creates**.
 
-Uninstall Marginalia and your reMarkable is exactly as it was — because nothing
-was ever changed.
+Removing it is removing that directory — which is what
+[`reset.sh`](tools/device/reset.sh) does, and then verifies. There is nothing
+to restore afterwards, because nothing was ever changed.
 
 ### 2. Syncing moves knowledge, not files
 
@@ -254,7 +276,17 @@ Full instructions, per platform, with troubleshooting:
 The short version — you need Rust 1.77+, Node 20+ and pnpm 9+:
 
 ```bash
-git clone https://github.com/USER/marginalia.git && cd marginalia && pnpm install
+git clone https://github.com/cyuss/marginalia.git && cd marginalia
+make setup          # or: just setup
+```
+
+Everything is available through `make` or `just`, with identical names:
+
+```bash
+make check                  # everything CI runs
+make build-device-docker    # build the agent for the reMarkable (needs Docker)
+make verify-device-binary   # run that ARM binary under emulation
+make device                 # what you can do to a connected device
 ```
 
 Verify the core, which needs only Rust:
