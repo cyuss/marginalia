@@ -71,8 +71,15 @@ path_is_ours() {
 
 # ── talking to the device ────────────────────────────────────────────────────
 
+# `-n` matters more than it looks. Without it ssh reads the script's own stdin
+# and hands it to the remote command, so a check running before a prompt eats
+# the answer the operator is about to give -- observed in reset.sh, where the
+# safety checks in step 3 swallowed the confirmation and the removal was then
+# refused for want of an answer that had already been typed. Failing closed was
+# right, but the cause is this. No caller pipes local data to the device; the
+# one redirect we use (`wc -l < file`) is evaluated on the device.
 rm_ssh() {
-  ssh -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new "${RM_USER}@${RM_HOST}" "$@"
+  ssh -n -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new "${RM_USER}@${RM_HOST}" "$@"
 }
 
 rm_scp() {
@@ -91,9 +98,20 @@ require_device() {
   fi
 }
 
-# Model and firmware, for the compatibility record. Read-only.
+# Firmware release, for the compatibility record. Read-only.
+#
+# WHY not /etc/version: on a reMarkable 2 running 3.28 that file holds a build
+# timestamp (20260806095513), not a release. Reporting it as the firmware makes
+# every compatibility statement meaningless. The release lives in update.conf as
+# a four-component string ("3.28.0.166"), with os-release's IMG_VERSION as a
+# fallback for images that ship one and not the other. Verified on hardware.
 device_description() {
-  rm_ssh 'cat /etc/version 2>/dev/null || echo unknown' | tr -d '\r'
+  rm_ssh '
+    v=$(sed -n "s/^REMARKABLE_RELEASE_VERSION=//p" /usr/share/remarkable/update.conf 2>/dev/null)
+    [ -n "$v" ] || v=$(sed -n "s/^IMG_VERSION=\"\\(.*\\)\"/\\1/p" /etc/os-release 2>/dev/null)
+    [ -n "$v" ] || v=unknown
+    echo "$v"
+  ' | tr -d '\r'
 }
 
 confirm() {

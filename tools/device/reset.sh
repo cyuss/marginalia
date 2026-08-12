@@ -65,7 +65,10 @@ size=$(rm_ssh "du -sh '$MARGINALIA_HOME' 2>/dev/null | awk '{print \$1}'" | tr -
 info "${MARGINALIA_HOME}"
 info "${file_count} file(s), ${size}"
 say ""
-rm_ssh "find '$MARGINALIA_HOME' -type f 2>/dev/null | head -30 | sed 's|^|      |'"
+# `head -n 30`, not `head -30`: the reMarkable's coreutils are BusyBox, which
+# rejects the short form outright ("invalid option -- '3'"). Anything inside an
+# rm_ssh string runs there, not here.
+rm_ssh "find '$MARGINALIA_HOME' -type f 2>/dev/null | head -n 30 | sed 's|^|      |'"
 if (( file_count > 30 )); then
   info "… and $(( file_count - 30 )) more"
 fi

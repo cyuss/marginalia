@@ -65,17 +65,37 @@ if (( DRY_RUN )); then
   info "would produce:    ${artifact}"
   artifact="(not built)"
 else
+  # Being installed is not the same as working. On a machine with both `cross`
+  # and `rustup`, `cross` still fails if it cannot provision the toolchain
+  # rust-toolchain.toml pins for the container's own architecture -- observed on
+  # an arm64 Mac, where it tried to add a x86_64-unknown-linux-gnu toolchain and
+  # gave up. So a failure of the preferred builder falls back to the container,
+  # which needs only Docker. A real compile error fails both and still stops the
+  # install; the cost of that is one wasted build, not a bad binary on a device.
+  build_failed=0
   case "$builder" in
     host)
       ( cd "$REPO_ROOT" && cargo build --release --target "$TARGET" -p marginalia-agent --features network ) \
-        || die "the build failed" "Nothing was sent to your reMarkable." ;;
+        || build_failed=1 ;;
     cross)
       ( cd "$REPO_ROOT" && cross build --release --target "$TARGET" -p marginalia-agent --features network ) \
-        || die "the build failed" "Nothing was sent to your reMarkable." ;;
+        || build_failed=1 ;;
     docker)
       "$REPO_ROOT/tools/device/build-in-docker.sh" \
         || die "the build failed" "Nothing was sent to your reMarkable." ;;
   esac
+
+  if (( build_failed )) && [[ "$builder" != "docker" ]]; then
+    warn "${builder} could not build — falling back to the container"
+    # No `command -v docker` guard here: Docker Desktop keeps its CLI off the
+    # PATH, so that test reports "no Docker" on a machine that has it. The
+    # container script already resolves the CLI and explains itself if it is
+    # genuinely missing. One place that knows how to find Docker, not two.
+    "$REPO_ROOT/tools/device/build-in-docker.sh" \
+      || die "the build failed" "Nothing was sent to your reMarkable."
+    builder="docker"
+    artifact="$REPO_ROOT/target/device/$TARGET/release/$BINARY"
+  fi
 
   [[ -f "$artifact" ]] || die "the build produced no binary at $artifact"
   ok "built $(du -h "$artifact" | awk '{print $1}')"
@@ -83,7 +103,7 @@ fi
 
 # ── 3. storage check ─────────────────────────────────────────────────────────
 step "3 · Checking there is room"
-free_kb=$(rm_ssh "df -k /home | tail -1 | awk '{print \$4}'" | tr -d '\r')
+free_kb=$(rm_ssh "df -k /home | tail -n 1 | awk '{print \$4}'" | tr -d '\r')
 info "$(( free_kb / 1024 )) MB free"
 if (( free_kb < 51200 )); then
   die "less than 50 MB free on your reMarkable" \
@@ -129,9 +149,19 @@ fi
 # ── 5. manifest ──────────────────────────────────────────────────────────────
 # Every file we placed, so that removal is exact rather than approximate.
 step "5 · Recording what was installed"
+# Read the version here, not inside the ssh command. Nested quoting sent the
+# whole substitution to the device, where it ran against a BusyBox `cut` and a
+# Cargo.toml that does not exist -- printing "cut: bad delimiter" and recording
+# an empty version. A manifest that cannot say what it installed is not a
+# manifest. Whatever is computed from this machine's checkout is computed on
+# this machine.
+version=$(awk -F'"' '/^version/ {print $2; exit}' "$REPO_ROOT/Cargo.toml")
+[[ -n "$version" ]] || die "could not read the version from Cargo.toml" \
+                          "The agent is installed but unrecorded; run reset.sh."
+
 rm_ssh "cd '$MARGINALIA_HOME' && {
   printf '# Marginalia install manifest\n'
-  printf '# version\t%s\n' '$(cd "$REPO_ROOT" && grep -m1 '^version' Cargo.toml | cut -d'\"' -f2)'
+  printf '# version\t%s\n' '$version'
   printf '# installed\t%s\n' \"\$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
   printf '# firmware\t%s\n' '$firmware'
   printf '%s\t%s\n' 'bin/${BINARY}' '$local_sum'
@@ -156,7 +186,7 @@ say "  Try it:"
 say "      ssh ${RM_USER}@${RM_HOST} '${MARGINALIA_HOME}/bin/${BINARY} status'"
 say ""
 say "  Connect your Zotero library:"
-say "      see docs/remarkable/INSTALL_ON_DEVICE.md"
+say "      see docs/INSTALL_REMARKABLE.md"
 say ""
 say "  To remove it completely and return your reMarkable to stock:"
 say "      ./tools/device/reset.sh"

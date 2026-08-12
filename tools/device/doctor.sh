@@ -32,7 +32,7 @@ if rm_ssh true 2>/dev/null; then
   ok "reachable at ${RM_HOST}"
   info "firmware $(device_description)"
 
-  free_kb=$(rm_ssh "df -k /home | tail -1 | awk '{print \$4}'" | tr -d '\r')
+  free_kb=$(rm_ssh "df -k /home | tail -n 1 | awk '{print \$4}'" | tr -d '\r')
   if [[ -n "$free_kb" ]]; then
     info "$(( free_kb / 1024 )) MB free in /home"
     if (( free_kb < 512000 )); then
