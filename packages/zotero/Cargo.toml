@@ -1,0 +1,24 @@
+[package]
+name = "marginalia-zotero"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Zotero adapter: credentials, verification, metadata sync. HTTP is optional so the portable core stays ARM-clean."
+
+[features]
+default = []
+# The real HTTP client. Off by default because whether a TLS stack builds for
+# armv7 is an open question (U16), and the rest of this crate must not be held
+# hostage to it.
+http = ["dep:ureq"]
+
+[dependencies]
+marginalia-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+ureq = { version = "2", optional = true }
+
+[dev-dependencies]
+marginalia-platform.workspace = true

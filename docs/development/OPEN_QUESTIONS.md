@@ -189,10 +189,31 @@ such rather than quietly accepted.
 Which root certificate store is available, whether to bundle one, and how it is
 updated. Blocks Phase 2 (direct HTTPS to the Zotero API from the device).
 
-## U17 — Cross-compiling `libsqlite3-sys`
+**Partially answered 2026-08-12.** Building the Zotero HTTP client produced two
+concrete findings:
 
-`marginalia-database` needs a cross C toolchain. Not an architecture problem;
-see [ADR-003](../adr/ADR-003-cross-compilation.md). Low severity, clear remedy.
+1. **`ureq`'s TLS chain needs a cross C compiler for armv7**, failing with
+   `failed to find tool "arm-linux-gnueabihf-gcc"` — the *same* blocker as
+   `libsqlite3-sys` (U17). One cross toolchain therefore unblocks both. This is
+   a build-environment problem, not an architecture one.
+2. **It raised the project MSRV to 1.90.** `ureq` → `url` → `idna` → `icu_*`
+   requires rustc 1.86+. Pinning around it was attempted and does not work: the
+   whole `idna`/`url` subtree moved together. `rust-toolchain.toml` was raised
+   from 1.85 to 1.90 and records why.
+
+Still open: which root store the device has, and whether we bundle one. The
+`http` feature is **off by default** so the portable crates keep cross-compiling
+while this is unresolved.
+
+## U17 — Cross-compiling the C dependencies
+
+`marginalia-database` (via `libsqlite3-sys`) and the Zotero `http` feature (via
+its TLS stack) both need a cross C toolchain. Not an architecture problem; see
+[ADR-003](../adr/ADR-003-cross-compilation.md).
+
+Severity raised from low to **medium**: it now blocks two crates rather than
+one, and it is on the critical path for any real device build. The remedy is
+unchanged and well understood — `cross`/Docker, or a host cross-gcc.
 
 ---
 
@@ -205,5 +226,5 @@ see [ADR-003](../adr/ADR-003-cross-compilation.md). Low severity, clear remedy.
 | U13 | open | high | Phase 1 packaging |
 | U14 | open | medium | Phase 1 budgets |
 | U15 | open | high | Phase 5 |
-| U16 | open | medium | Phase 2 |
-| U17 | open | low | build slice 8 |
+| U16 | partially answered | medium | Phase 2 |
+| U17 | open | **medium** | build slice 8; blocks database + TLS |

@@ -28,3 +28,9 @@ Thumbs.db
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Local secrets. Never committed — the Zotero key belongs in your environment
+# or in the app's own credential store, never in the repository.
+.env
+.env.local
+*.secret
