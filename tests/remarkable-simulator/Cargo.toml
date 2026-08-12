@@ -10,3 +10,8 @@ marginalia-core.workspace = true
 marginalia-safety.workspace = true
 marginalia-remarkable.workspace = true
 chrono.workspace = true
+
+[dev-dependencies]
+# Device-side fault tests exercise real SQLite files under the Device profile.
+# A dev-dependency, so the simulator library itself stays storage-agnostic.
+marginalia-database.workspace = true

@@ -409,6 +409,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "marginalia-core",
+ "marginalia-database",
  "marginalia-remarkable",
  "marginalia-safety",
 ]
