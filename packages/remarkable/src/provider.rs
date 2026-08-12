@@ -1,4 +1,17 @@
-//! The `DeviceProvider` port.
+//! The device ports.
+//!
+//! There are two, because the standalone decision creates two very different
+//! relationships with a reMarkable:
+//!
+//! - [`DeviceIntrospection`] — what an application **running on the device**
+//!   can ask about the machine it is running on. All reads, no transport, no
+//!   grant. This is what the standalone runtime uses.
+//! - [`RemoteDeviceTransport`] — what the **desktop companion** does across a
+//!   cable or a network. Reads plus the four whitelisted writes.
+//!
+//! Phase 0 had only the second, under the name `DeviceProvider`. That name was
+//! wrong the moment the device became the primary runtime: a device does not
+//! "provide" itself.
 //!
 //! # How the safety rule is expressed
 //!
@@ -102,8 +115,28 @@ impl ValidatedPdf {
     }
 }
 
-/// Everything Marginalia may ask of a physical device.
-pub trait DeviceProvider {
+/// What an application running **on** a reMarkable can learn about it.
+///
+/// Deliberately tiny. It contains only what the standalone runtime genuinely
+/// needs today: identity, so the capability layer can resolve what is
+/// permitted, and storage, so the reserve can be enforced before the app
+/// writes anything of its own.
+///
+/// Listing native documents from on-device is **not** here, because how an
+/// application may do that safely is unresolved (U13). Adding a method for it
+/// now would be guessing, and the whole compatibility design exists to avoid
+/// that.
+pub trait DeviceIntrospection {
+    /// Identity and firmware of the machine we are running on.
+    fn device_info(&self) -> DeviceResult<Device>;
+
+    /// Free and total space, for the storage reserve.
+    fn storage(&self) -> DeviceResult<StorageInfo>;
+}
+
+/// Everything the desktop companion may ask of a physical device across a
+/// cable or a network.
+pub trait RemoteDeviceTransport {
     // ── GREEN: reads. No grant required. ─────────────────────────────────
 
     fn detect(&self) -> DeviceResult<Device>;

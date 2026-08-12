@@ -21,7 +21,8 @@ use marginalia_core::device::{Device, StorageInfo};
 use marginalia_core::ids::RemarkableDocumentId;
 use marginalia_core::Checksum;
 use marginalia_remarkable::provider::{
-    DeviceProvider, DeviceProviderError, DeviceResult, RemoteDocument, ValidatedPdf,
+    DeviceIntrospection, DeviceProviderError, DeviceResult, RemoteDeviceTransport, RemoteDocument,
+    ValidatedPdf,
 };
 use marginalia_safety::classification::DeviceOperation;
 use marginalia_safety::WriteGrant;
@@ -170,7 +171,23 @@ impl SimulatedDevice {
     }
 }
 
-impl DeviceProvider for SimulatedDevice {
+impl DeviceIntrospection for SimulatedDevice {
+    fn device_info(&self) -> DeviceResult<Device> {
+        if !self.profile.connected {
+            return Err(DeviceProviderError::NotConnected);
+        }
+        Ok(self.profile.device.clone())
+    }
+
+    fn storage(&self) -> DeviceResult<StorageInfo> {
+        self.profile
+            .device
+            .storage
+            .ok_or(DeviceProviderError::NotConnected)
+    }
+}
+
+impl RemoteDeviceTransport for SimulatedDevice {
     fn detect(&self) -> DeviceResult<Device> {
         if !self.profile.connected {
             return Err(DeviceProviderError::NotConnected);

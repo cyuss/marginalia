@@ -21,7 +21,7 @@ use marginalia_core::sync::{JobTrigger, MetadataOperation, SyncJobKind, SyncPlan
 use marginalia_core::zotero::AttachmentAvailability;
 use marginalia_core::Checksum;
 
-use marginalia_remarkable::provider::{DeviceProvider, ValidatedPdf};
+use marginalia_remarkable::provider::{DeviceIntrospection, RemoteDeviceTransport, ValidatedPdf};
 use marginalia_remarkable::CapabilityResolver;
 
 use marginalia_safety::classification::DeviceOperation;
@@ -89,6 +89,40 @@ fn sample_pdf() -> ValidatedPdf {
         84 * MB,
         15,
     )
+}
+
+// ── On-device introspection ────────────────────────────────────────────────
+
+/// The standalone runtime asks the machine it runs on about itself. That must
+/// be possible without a grant, without a transport, and without any ability to
+/// change anything — the port's whole surface is two reads.
+#[test]
+fn on_device_introspection_needs_no_grant_and_cannot_write() {
+    let sim = SimulatedDevice::new(DeviceProfile::known_healthy());
+
+    let info = DeviceIntrospection::device_info(&sim).expect("identity");
+    assert!(info.firmware_is_known());
+
+    let storage = DeviceIntrospection::storage(&sim).expect("storage");
+    assert!(storage.free_bytes > 0);
+
+    // Reading told us nothing was written.
+    assert_eq!(sim.write_count(), 0);
+    assert_eq!(sim.document_count(), 0);
+}
+
+/// Storage introspection exists so the device can enforce its own reserve
+/// before writing anything of its own -- the standalone runtime shares the
+/// disk with the user's documents.
+#[test]
+fn on_device_storage_feeds_the_reserve_check() {
+    let sim = SimulatedDevice::new(DeviceProfile::low_storage());
+    let storage = DeviceIntrospection::storage(&sim).unwrap();
+
+    assert!(
+        !storage.can_accept(84 * MB, DEFAULT_STORAGE_RESERVE_BYTES),
+        "a device below its reserve must refuse its own writes too, not just transfers"
+    );
 }
 
 // ── S1 ──────────────────────────────────────────────────────────────────────
