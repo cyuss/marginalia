@@ -2,445 +2,350 @@
 
 # Marginalia
 
-**A local-first research, reading and annotation companion for reMarkable.**
+**A local-first research companion that runs _on_ your reMarkable 2.**
 
-Connect your Zotero library to your reMarkable 2 — and get your highlights and
-handwritten notes back as searchable, citable knowledge.
+Your Zotero library, readable on the device. Your highlights and handwritten
+notes, back in your bibliography. Your reMarkable, completely untouched.
 
-[Install](docs/INSTALL.md) · [Architecture](docs/architecture/ARCHITECTURE.md) ·
-[Safety model](docs/safety/SAFETY_MODEL.md) · [Roadmap](ROADMAP.md) ·
-[Contributing](CONTRIBUTING.md)
+[Why](#why) · [How it works](#how-it-works) · [Install](docs/INSTALL.md) ·
+[Architecture](docs/architecture/ARCHITECTURE.md) ·
+[Safety model](docs/safety/SAFETY_MODEL.md) · [Roadmap](ROADMAP.md)
+
+<sub>MIT licensed · not affiliated with reMarkable AS</sub>
 
 </div>
 
 ---
 
-> ### Status: early, and honest about it
+> ### Status — early, and honest about it
 >
-> **Works and is tested:** the domain and safety layers, local storage, the
-> device simulator, incremental Zotero metadata sync (paginated, resumable,
-> with tags and collections), and an on-device agent that cross-compiles for
-> the reMarkable 2 and runs — verified under emulation, including reaching the
-> real Zotero API over TLS.
+> **Works, and is covered by 310 tests:** the domain and safety layers, local
+> storage, the device simulator, incremental Zotero metadata sync, and an agent
+> that cross-compiles for the reMarkable 2 and **runs** — verified under
+> emulation, including reaching the live Zotero API over TLS.
 >
-> **Not done:** no reMarkable has been touched. Generating the documents you
-> would actually read is the next phase, and it is [not certain that
-> highlighted text can be recovered at all](docs/development/OPEN_QUESTIONS.md)
+> **Not done:** no reMarkable has been touched yet. Generating the documents you
+> would actually read is the next phase, and it is
+> [not certain that highlighted text can be recovered at all](docs/development/OPEN_QUESTIONS.md)
 > on current firmware.
 >
-> Built in public, phase by phase, with the unknowns written down. See
-> [ROADMAP.md](ROADMAP.md).
+> Built in public, phase by phase, with every unknown written down.
 
----
+## Why
 
-## The problem
+If you read research on a reMarkable, you already know the gap.
 
-If you read research on a reMarkable, you know the gap.
+The device is superb at reading and writing. It is not a research tool. Papers
+arrive as `attention.pdf` — no author, no year, no journal, no collection. You
+highlight a passage that turns out to matter, and three months later you cannot
+remember which of forty PDFs it was in. Your handwriting lives on the device;
+your bibliography lives in Zotero; nothing joins them.
 
-The device is excellent at reading and writing. It is not a research tool. Your
-papers arrive as `attention.pdf` with no author, no year, no journal, no
-collection. You highlight a passage that turns out to matter, and three months
-later you cannot remember which of forty PDFs it was in. Your handwritten notes
-live on the device; your bibliography lives in Zotero; nothing connects them.
+The existing answers each cost something you should not have to pay:
 
-The usual answers are worse than the problem. Tools that "fix" the reMarkable
-by patching its system software risk the device itself. Tools that sync
-everything automatically fill 8 GB of storage with papers you never intended to
-read there.
+| Approach | What it costs you |
+|---|---|
+| Patch the device's software | The device itself. A firmware update can break your workflow, or worse. |
+| Sync everything automatically | 8 GB filled with papers you never meant to read there. |
+| Do it by hand | The thing you were trying to avoid. |
 
-## What Marginalia does
+Marginalia takes a fourth path: **add the missing layer, touch nothing else.**
 
-It adds the missing layer, and only that layer:
+## How it works
 
-```
-Zotero  ──── metadata ────►  Marginalia  ──── you press Send ────►  reMarkable 2
-                                  ▲                                      │
-                                  └──── highlights, handwritten notes ────┘
-                                  │
-              Annotation Inbox · Search · Metadata · Export to Zotero
-```
+<img src="docs/assets/pipeline.svg" alt="Zotero syncs metadata to Marginalia continuously and moves zero PDF bytes. A single PDF crosses to the reMarkable only after you tick a box. Highlights and notes flow back." width="100%">
 
-**Library → Reading → Annotation → Knowledge → Zotero.**
+Three ideas, and the whole design follows from them.
 
-### It has no interface on the device, on purpose
+### 1 · Syncing moves knowledge, not files
 
-Every known way to draw a custom UI on a reMarkable 2 requires injecting a
-library into a system process. Marginalia refuses to do that, so instead
-**everything it shows you is a document in your library**, rendered by the
-reader you already use.
-
-To ask for a paper, you **tick a box with your stylus** on a generated index.
-Marginalia reads that page on its next sync and fetches the one you ticked. It
-therefore only ever needs to *read* your annotations — which is why it can
-leave the rest of your device completely alone. The reasoning is in
-[ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md) and
-[ADR-006](docs/adr/ADR-006-on-device-interaction.md).
-
-Your reMarkable stays a reMarkable. Handwriting, pen tools, notebooks, PDF
-reading, page navigation, native tags, native search — all of it stays native
-and untouched. Marginalia does not recreate any of it.
-
-## Three promises
-
-These are not aspirations. They are enforced by the architecture, and each is
-covered by tests that must pass for any change to merge.
-
-### 1. Your reMarkable stays completely stock
-
-Marginalia never patches `xochitl`, never touches the bootloader, kernel or
-system partitions, never replaces system libraries, and never interferes with
-firmware updates. Everything it installs lives in **one directory it creates**.
-
-Removing it is removing that directory — which is what
-[`reset.sh`](tools/device/reset.sh) does, and then verifies. There is nothing
-to restore afterwards, because nothing was ever changed.
-
-### 2. Syncing moves knowledge, not files
-
-This is the promise most tools get wrong, so it is worth being precise:
-
-> **Sync** updates metadata, tags, collections and annotations.
-> **Send to reMarkable** transfers one specific PDF, because you asked.
+> **Sync** brings titles, authors, collections, tags, and *which* PDFs exist.
+> **A deliberate request** brings one specific PDF.
 
 A sync will never copy a PDF to your device. Not for one paper, not for five
-hundred. You can browse your entire Zotero library inside Marginalia — every
-title, author, collection and tag, and whether a PDF is available — with zero
-bytes on your reMarkable.
+hundred. You can browse your entire library — every title, author, collection
+and tag — with **zero bytes** on the reMarkable.
 
-Every sync report shows the transfer count, including when it is zero:
+This is not a promise in a README. `MetadataOperation` is an enum with no
+variant capable of expressing a file transfer, and the sync executor accepts
+only that type. The sentence cannot be written.
 
-```
-Sync completed
+### 2 · There is no interface on the device, on purpose
 
-Updated metadata        12
-New Zotero items         4
-Updated tags             7
-Annotations imported     8
-PDFs transferred         0     ← always shown
-```
+Every known way to draw a custom UI on a reMarkable 2 requires injecting a
+library into a system process — [we checked, with
+sources](docs/remarkable/ECOSYSTEM.md). Marginalia will not do that.
 
-### 3. Your original PDFs are never modified
+So it does something better suited to the hardware: **everything it shows you is
+a document in your library**, rendered by the reader you already use. To ask for
+a paper, you tick a box with your stylus.
 
-Source files are opened read-only, always. Annotated versions are separate
-derived files. A failed derivation is discarded; it cannot partially overwrite
-anything.
+<img src="docs/assets/interaction.svg" alt="Marginalia generates an index document with a tick box beside each paper. You tick one with the stylus. On its next sync the agent reads that mark and fetches that one paper, through the same authorisation a button would use." width="100%">
 
----
+The consequence is the point: Marginalia only ever needs permission to **read**
+your annotations, which is why it can leave the rest of your device completely
+alone.
 
-## How the promises are enforced
+### 3 · Safety is a compile error, not a code review
 
-Most software makes safety promises in documentation and enforces them with
-code review. Marginalia enforces them with the type system, so that breaking one
-is a compile error rather than a bug report from someone whose device stopped
-working.
+<img src="docs/assets/safety.svg" alt="A device write passes ten checks in order and any doubt denies. Success produces a single-use WriteGrant; the type cannot be constructed outside the safety crate." width="100%">
 
-### Writes require a token that almost nothing can create
-
-Every function that changes something on a device takes a `WriteGrant`:
+Every function that changes something on a device takes a `&WriteGrant`. That
+type holds a field no other module can name, so **there is no way to write to a
+device without going through the authorisation path** — not because we
+remembered to check, but because the alternative does not compile.
 
 ```rust
-// reads — no grant needed
+// read — no grant needed
 fn list_documents(&self) -> DeviceResult<Vec<RemoteDocument>>;
 
-// writes — the grant is a required parameter, not a check inside the body
+// write — the grant is a parameter, not a check inside the body
 fn upload_document(&mut self, grant: &WriteGrant, pdf: &ValidatedPdf, name: &str)
     -> DeviceResult<RemarkableDocumentId>;
 ```
 
-`WriteGrant` holds a field of a private type. Rust therefore forbids
-constructing one anywhere outside the safety crate — there is no struct
-literal, no `Default`, no deserialisation path. The only way to obtain one is
-`SafetyManager::authorize()`, which runs every check and **fails closed** at
-the first doubt.
+## What Marginalia may do to your device
 
-A contributor who adds a new device write and forgets the safety check does not
-introduce a dangerous bug. Their code does not compile.
+Four operations. That is the entire list.
 
-### "Sync" and "transfer" are different types
+```mermaid
+flowchart LR
+    A["add one PDF<br/>you asked for"] --- B["remove one<br/>it put there"]
+    B --- C["set tags on a<br/>document it manages"]
+    C --- D["replace one it put there<br/>with its annotated version"]
 
-```rust
-enum MetadataOperation {         // what a sync may do
-    UpsertZoteroItem { .. },
-    UpsertAttachmentAvailability { .. },   // records a fact, moves nothing
-    // ← there is deliberately NO variant that can move a file
-}
-
-enum TransferOperation {         // what pressing Send may do
-    UploadPdf { intent: ExplicitUserIntent, .. },
-    RemoveDeviceDocument { intent: ExplicitUserIntent, .. },
-}
+    style A fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
+    style B fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
+    style C fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
+    style D fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
 ```
 
-The sync executor accepts only the first type. There is no program in which a
-metadata sync transfers a PDF — not because we remembered to check, but because
-the sentence cannot be written. `ExplicitUserIntent` is created only by the
-command handler behind a button you pressed, is scoped to one document and one
-action, expires, and is consumed on use.
+All user-initiated, one document at a time, reversible, verified by checksum
+afterwards, with a tested rollback. Everything installed lives in **one
+directory** — removing Marginalia is removing that directory, which
+[`reset.sh`](tools/device/reset.sh) does and then *verifies*.
 
-Two further independent guards back this up: the document state machine (only
-one edge reaches a transfer, and only via an explicit user event) and a SQL
-`CHECK` constraint (a scheduled transfer job is rejected by the database).
+Never, under any flag, setting or debug mode:
+
+```
+✗ patch or replace xochitl      ✗ modify the kernel, bootloader or updater
+✗ write to a system partition   ✗ install a package manager
+✗ create a startup entry        ✗ touch a document it did not put there
+✗ modify an original PDF        ✗ delete anything to free space
+```
 
 ### Untested firmware means read-only
 
-reMarkable firmware evolves. No feature code in Marginalia parses a firmware
-string; it asks a capability layer, which answers from a versioned matrix.
+No feature code parses a firmware string; it asks a capability layer backed by a
+versioned matrix. Anything unverified on real hardware resolves to `UNKNOWN`,
+and `UNKNOWN` never permits a write. A matrix entry claiming `SUPPORTED` with no
+test date is loaded as `UNKNOWN` regardless — optimism in a data file cannot
+grant permissions. A user override can *restrict* a capability, never expand
+one; there is no "enable writes anyway" switch.
 
-Anything not verified on real hardware resolves to `UNKNOWN`, and `UNKNOWN`
-never permits a write. A matrix entry claiming `SUPPORTED` without a test date
-is loaded as `UNKNOWN` regardless — optimism in a data file cannot grant
-permissions. A user override can *restrict* a capability but never expand one:
-there is no "enable writes anyway" switch.
+If your device updates overnight, Marginalia drops to read-only and says why.
 
-If your device updates its firmware overnight, Marginalia drops to read-only
-and explains why. That is the correct behaviour.
+## The document lifecycle
 
-### Marginalia only touches what it put there
+Every paper has exactly one state, and exactly one edge in the whole machine
+puts a file on your device.
 
-A device document whose UUID is not in Marginalia's own mapping table belongs
-to you, and is read-only forever. Your notebooks are never written to under any
-circumstance. Nothing is ever deleted automatically — not to save space, not to
-resolve a conflict, not ever.
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> MetadataOnly
+    MetadataOnly --> AttachmentAvailable: PDF resolved
+    AttachmentAvailable --> MetadataOnly: PDF gone
 
-### The whole device write policy, in full
+    AttachmentAvailable --> TransferPending: you ask for it
+    TransferFailed --> TransferPending: retry
+    RemovedFromDevice --> TransferPending: ask again
 
-Marginalia may write to a reMarkable only to:
+    TransferPending --> OnRemarkable: checksum verified
+    TransferPending --> TransferFailed: rolled back, device clean
 
-1. add one PDF you explicitly sent;
-2. remove one document Marginalia itself transferred, on confirmation;
-3. set native tags on a document Marginalia manages, from a mapping you confirmed;
-4. replace a document Marginalia transferred with its annotated version
-   (feature-flagged off by default).
+    OnRemarkable --> Annotated: you write on it
+    Annotated --> ChangesPending: extracted
+    ChangesPending --> Synced: export to Zotero
 
-Four operations. All user-initiated, one document at a time, all reversible,
-all verified afterwards by checksum, all with a tested rollback. Anything else
-is forbidden — see [DEVICE_WRITE_POLICY.md](docs/safety/DEVICE_WRITE_POLICY.md).
+    Synced --> Conflict: divergent edits
+    Conflict --> Synced: you resolve it
+    Synced --> RemovedFromDevice: you remove it
+```
 
----
+The edges that begin *"you"* are ones no timer, scheduler or sync job can ever
+take. A test enumerates all 120 state-event pairs and fails if a second route to
+a transfer ever appears.
 
-## Features
+## Install
 
-Built and tested today (Phase 0):
-
-- The domain model and both state machines
-- The safety layer: `SafetyManager`, write grants, classification, snapshots, feature flags
-- SQLite storage with versioned migrations and schema-level safety constraints
-- The firmware capability layer and compatibility matrix
-- A deterministic reMarkable simulator with fault injection
-- The mandatory safety suite
-- The application shell
-
-Planned, phase by phase:
-
-| Phase | Feature |
-|---|---|
-| 1 | **Zotero sync** — metadata, collections, tags, attachment availability |
-| 2 | **Device connection** — detection, firmware, capabilities, storage (read-only) |
-| 3 | **Send to reMarkable** — validated, verified, reversible transfer |
-| 4 | **Highlight extractor** — turn highlights into quotable text with page and position |
-| 5 | **Annotation Inbox** — every note from every document, in one place |
-| 6 | **Search** — across PDF text, highlights, notes and Zotero metadata |
-| 7 | **Side notes & sticky notes** — structured, anchored, desktop-side |
-| 8 | **Tag bridge** — Zotero ↔ reMarkable tags, never silently merged |
-| 9 | **Command palette** — ⌘K / Ctrl+K |
-| 10 | Optional companion — only if something genuinely cannot live on the desktop |
-
----
-
-## What it deliberately does not do
-
-Replace the home screen · replace the PDF reader · replace notebooks · custom
-firmware or kernels · background daemons on the device · an app store · cloud
-collaboration · AI summaries · OCR competing with native handwriting search ·
-automatic bulk syncing · automatic deletion to save space.
-
----
-
-## Privacy
-
-No account. No Marginalia server. No telemetry. No analytics. No document or
-annotation upload. Everything lives in a local SQLite database on your machine.
-
-The only outbound traffic is to the Zotero API, and only if you configure it.
-Credentials live in your operating system's secure storage — macOS Keychain,
-Windows Credential Manager, Linux Secret Service — never in the database, never
-in a config file, never in a log.
-
----
-
-## Installing
-
-Full instructions, per platform, with troubleshooting:
-**[docs/INSTALL.md](docs/INSTALL.md)**
-
-The short version — you need Rust 1.77+, Node 20+ and pnpm 9+:
+Full guide: **[docs/INSTALL.md](docs/INSTALL.md)** ·
+On the device: **[docs/remarkable/INSTALL_ON_DEVICE.md](docs/remarkable/INSTALL_ON_DEVICE.md)**
 
 ```bash
 git clone https://github.com/cyuss/marginalia.git && cd marginalia
-make setup          # or: just setup
+make setup            # or: just setup — identical names in both
 ```
 
-Everything is available through `make` or `just`, with identical names:
+Everything runs through `make` or `just`:
 
 ```bash
 make check                  # everything CI runs
-make build-device-docker    # build the agent for the reMarkable (needs Docker)
+make build-device-docker    # build the agent for the reMarkable (needs only Docker)
 make verify-device-binary   # run that ARM binary under emulation
 make device                 # what you can do to a connected device
 ```
 
-Verify the core, which needs only Rust:
+You need **Rust 1.90+**, **Node 20+**, and **Docker** for device builds. You do
+**not** need a reMarkable or a Zotero account to develop — there is a simulator
+and synthetic fixtures.
+
+### Connecting Zotero
+
+You need an API key and nothing else — the library ID is discovered from the key.
 
 ```bash
-cargo test --workspace
+marginalia zotero connect <your-key>
+marginalia sync
 ```
 
-Run the safety suite:
-
-```bash
-cargo test -p marginalia-safety-suite -- --nocapture
-```
-
-Launch the app:
-
-```bash
-pnpm dev
-```
-
-You do not need a reMarkable or a Zotero library to develop Marginalia.
-Development runs against a simulator and synthetic fixtures.
-
----
+A key is **verified before it is stored, never after**. A key Zotero rejects
+never reaches your disk, so setup cannot appear to succeed while nothing works.
 
 ## Architecture
 
-Desktop-first: roughly 90% of Marginalia runs on your computer, and in V1,
-100%. Nothing runs on the reMarkable.
+```mermaid
+flowchart TD
+    subgraph apps["applications"]
+        AG["apps/remarkable<br/><i>the on-device agent</i>"]
+        DK["apps/desktop<br/><i>optional companion</i>"]
+    end
+    subgraph app["application layer"]
+        SY["sync<br/><i>the use case</i>"]
+    end
+    subgraph adapters["adapters"]
+        ZO["zotero"]
+        DB["database"]
+        PL["platform"]
+        RM["remarkable"]
+    end
+    subgraph domain["domain — depends on nothing"]
+        CO["core<br/><i>entities · state machines · ports</i>"]
+        SA["safety<br/><i>grants · classification</i>"]
+    end
 
+    AG --> SY
+    DK --> SY
+    SY --> ZO & DB
+    ZO & DB & PL & RM --> CO
+    RM --> SA
+    SA --> CO
+
+    style CO fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
+    style SA fill:#E4EDE9,stroke:#2F5D50,color:#1A1917
 ```
-apps/desktop/          Tauri 2 shell — React + TypeScript UI, Rust core
-packages/core/         domain model, state machines — depends on nothing
-packages/safety/       the only place a device write can be authorised
-packages/database/     SQLite, migrations, repositories
-packages/remarkable/   the device port + firmware compatibility matrix
-packages/observability/ structured logging with a SAFETY audit channel
-tests/remarkable-simulator/  a simulated device, including its failure modes
-tests/safety/          the mandatory safety suite
-```
 
-Dependencies point inward. `core` is pure — no filesystem, no network, no
-device — which is what makes the safety rules exhaustively testable without
-hardware.
+Dependencies point inward, and **CI fails on a forbidden edge** — the rule is a
+test that reads the actual manifests, not a diagram that drifts.
 
-**Stack:** Tauri 2, React 18 + TypeScript (strict), Vite, Tailwind, Radix,
-TanStack Query, Rust, SQLite + FTS5, `pdfium-render` + `lopdf` for PDF work.
+`core` is pure: no filesystem, no network, no database. That purity is what lets
+the safety rules be tested exhaustively without hardware.
 
-The reasoning behind the stack, including why the PDF layer is Rust rather than
-a Python sidecar, is in
-[ADR-001](docs/architecture/ADR-001-backend-stack.md).
-
-### Documentation
-
-| Document | What it covers |
+| | |
 |---|---|
-| [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) | System design and the three invariants |
-| [DOMAIN_MODEL.md](docs/architecture/DOMAIN_MODEL.md) | Entities and identity rules |
-| [DOCUMENT_STATE_MACHINE.md](docs/architecture/DOCUMENT_STATE_MACHINE.md) | Document lifecycle |
-| [SYNC_STATE_MACHINE.md](docs/architecture/SYNC_STATE_MACHINE.md) | Jobs and the transfer firewall |
-| [SAFETY_MODEL.md](docs/safety/SAFETY_MODEL.md) | Classification, SafetyManager, mandatory tests |
-| [DEVICE_WRITE_POLICY.md](docs/safety/DEVICE_WRITE_POLICY.md) | Exactly what may be written |
-| [ZOTERO_SYNC_MODEL.md](docs/zotero/ZOTERO_SYNC_MODEL.md) | How Zotero is used |
-| [COMPATIBILITY_MODEL.md](docs/remarkable/COMPATIBILITY_MODEL.md) | Firmware and capabilities |
-| [OPEN_QUESTIONS.md](docs/development/OPEN_QUESTIONS.md) | What still needs validating |
+| **Language** | Rust (portable core) · TypeScript + React (desktop companion) |
+| **Storage** | SQLite — WAL on the desktop, rollback journal and `synchronous=FULL` on the device |
+| **Device target** | `armv7-unknown-linux-gnueabihf`, built in a container |
+| **Desktop shell** | Tauri 2 |
 
----
+## Privacy
+
+No account. No Marginalia server. No telemetry. No analytics. Nothing uploaded.
+
+The only outbound traffic is to the Zotero API, and only if you configure it.
+Your key lives in a `0600` file in Marginalia's own directory, wrapped in a type
+that renders as `<redacted>` in **every** format including debug output — so a
+careless log line cannot leak it.
 
 ## Contributing
 
-Contributions are welcome. Because this project touches people's devices and
-their research libraries, please read
-[CONTRIBUTING.md](CONTRIBUTING.md) and
-[SAFETY_MODEL.md](docs/safety/SAFETY_MODEL.md) first.
-
-The short version:
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and
+[SAFETY_MODEL.md](docs/safety/SAFETY_MODEL.md) first. The short version:
 
 - Never patch `xochitl` or touch system partitions. No flag enables this.
 - Metadata sync must never transfer a file.
 - Original PDFs are read-only, always.
 - Unknown firmware means read-only. Fail closed.
-- Every device write goes through `SafetyManager` and carries a `WriteGrant`.
 - **If you do not know how a reMarkable behaves, do not guess.** Mark the
-  capability `UNKNOWN`, add an entry to
-  [OPEN_QUESTIONS.md](docs/development/OPEN_QUESTIONS.md), and stop. Never
-  compensate for uncertainty with a more invasive approach.
+  capability `UNKNOWN`, write it down in
+  [OPEN_QUESTIONS.md](docs/development/OPEN_QUESTIONS.md), and stop.
 
-Good first contributions right now: simulator fixtures, PDF test fixtures,
-documentation, UI work on the shell, and — especially — **firmware validation
-reports** from real devices, which is what moves capabilities off `UNKNOWN`.
-
-Before opening a pull request:
+Good first contributions: simulator fixtures, PDF test fixtures, documentation,
+and — most valuable of all — **firmware validation reports from real devices**,
+which is what moves a capability off `UNKNOWN`.
 
 ```bash
-pnpm check
+make check    # must pass; a failing safety test never merges
 ```
-
-A pull request with a failing or skipped safety test does not merge.
-
----
 
 ## FAQ
 
-**Will this brick my reMarkable?**
-It cannot. Marginalia never writes to system partitions, never patches
-`xochitl`, and never touches the bootloader, kernel or update mechanism. The
-current build has no device code at all. When transfers do arrive, they are
-limited to four whitelisted operations, all verified and reversible.
+<details>
+<summary><b>Will this brick my reMarkable?</b></summary>
 
-**Do I need to enable developer mode or install Toltec?**
-No Toltec, ever, and never automatically. Reading annotations from the device
-will likely require the developer access reMarkable itself provides — that is
-tracked as an open question, will be documented, and will always be your
-explicit choice.
+It cannot. Marginalia never writes to a system partition, never patches
+`xochitl`, and never touches the bootloader, kernel or update mechanism.
+Everything it installs is in one directory, and `reset.sh` removes it and then
+verifies the device is back to stock.
+</details>
 
-**Will it fill up my device?**
-It cannot. Nothing transfers without you pressing Send on a specific document.
-A configurable storage reserve is never spendable, and Marginalia never deletes
-anything to make room — it shows you what is large and lets you decide.
+<details>
+<summary><b>Do I need Toltec, or a launcher?</b></summary>
 
-**Does it work without Zotero?**
-Not yet. Zotero is the bibliographic source of truth in V1. The adapter
-boundary is designed so other reference managers are possible later.
+No, and never automatically. Marginalia has no interface on the device, so it
+needs neither. It does need the developer access reMarkable itself provides, to
+be installed over SSH — which you enable and can turn off again.
+</details>
 
-**Does it work with reMarkable 1 or Paper Pro?**
+<details>
+<summary><b>Will it fill up my device?</b></summary>
+
+It cannot. Nothing transfers without a deliberate request for a specific paper.
+A configurable storage reserve is never spendable, and Marginalia refuses **its
+own** writes before it would eat into it. It never deletes anything to make
+room — it shows you what is large and lets you decide.
+</details>
+
+<details>
+<summary><b>Why is so much unfinished?</b></summary>
+
+Because the alternative was shipping device code before the safety layer that
+constrains it. Everything dangerous is now impossible to express by accident,
+and every remaining unknown is written down rather than guessed at.
+</details>
+
+<details>
+<summary><b>reMarkable 1? Paper Pro?</b></summary>
+
 V1 targets the reMarkable 2. The device model and capability layer are designed
 so other models can be added without redesign, but they are not supported.
-
-**Why is so much of this unfinished?**
-Because the alternative is shipping device code before the safety layer that
-constrains it. Phase 0 exists so that every later phase is built inside a
-structure that makes the dangerous mistakes impossible.
-
----
+</details>
 
 ## Disclaimer
 
 ```
 Marginalia is an independent community project.
 
-It is not affiliated with, endorsed by,
-or sponsored by reMarkable AS.
-
+It is not affiliated with, endorsed by, or sponsored by reMarkable AS.
 reMarkable is a trademark of reMarkable AS.
 ```
 
-Marginalia uses no official reMarkable logos, branding or assets. Zotero is a
-trademark of the Corporation for Digital Scholarship.
+No official reMarkable logos, branding or assets are used. Zotero is a trademark
+of the Corporation for Digital Scholarship.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
-
-The dependency stack was chosen to keep this possible: PDFium is BSD-3 and
-`lopdf` is MIT, which is part of why the PDF layer is Rust rather than a
-PyMuPDF sidecar (PyMuPDF is AGPL-3.0 or commercial). See
+MIT — see [LICENSE](LICENSE). The dependency stack was chosen to keep it that
+way: PDFium is BSD-3 and `lopdf` is MIT, which is part of why the PDF layer is
+Rust rather than a PyMuPDF sidecar (AGPL-3.0 or commercial). See
 [ADR-001](docs/architecture/ADR-001-backend-stack.md).
