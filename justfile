@@ -11,7 +11,7 @@
 set shell := ["bash", "-uc"]
 
 RM_TARGET := "armv7-unknown-linux-gnueabihf"
-PORTABLE  := "-p marginalia-core -p marginalia-safety -p marginalia-observability -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero"
+PORTABLE  := "-p marginalia-core -p marginalia-safety -p marginalia-observability -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero -p marginalia-library-folder"
 
 # List every recipe, grouped.
 default:

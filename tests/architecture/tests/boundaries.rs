@@ -508,3 +508,78 @@ fn the_device_scripts_assert_their_home_is_safe() {
         );
     }
 }
+
+/// Crates that are portable but deliberately absent from `cross-check`.
+///
+/// `cargo check --target armv7` cannot build these without a cross **C**
+/// compiler, which the container build (`make build-device-docker`) has and a
+/// bare cargo does not. They are still built for the device — just not by this
+/// particular fast check.
+const CROSS_CHECK_EXEMPT: &[(&str, &str)] = &[
+    (
+        "marginalia-database",
+        "libsqlite3-sys compiles SQLite from C; covered by make build-device-docker",
+    ),
+    (
+        "marginalia-sync",
+        "depends on marginalia-database, so it inherits the same C toolchain need",
+    ),
+];
+
+/// Every crate the tests call portable must also be in the Makefile's
+/// cross-compile list, unless it is exempt above.
+///
+/// This exists because the two drifted: `marginalia-library-folder` was added,
+/// declared portable here, and left out of `make cross-check` — so CI would
+/// have gone on passing while a crate quietly stopped building for the device.
+/// A list maintained in two places by memory is a list that diverges.
+#[test]
+fn the_cross_compile_list_covers_every_portable_crate() {
+    let makefile = fs::read_to_string(workspace_root().join("Makefile")).expect("read Makefile");
+
+    // The PORTABLE variable, which may be continued across lines with a `\`.
+    let start = makefile
+        .find("PORTABLE")
+        .expect("Makefile defines PORTABLE");
+    let mut block = String::new();
+    for line in makefile[start..].lines() {
+        block.push_str(line);
+        if !line.trim_end().ends_with('\\') {
+            break;
+        }
+    }
+
+    for krate in PORTABLE_CRATES {
+        if CROSS_CHECK_EXEMPT.iter().any(|(name, _)| name == krate) {
+            continue;
+        }
+        assert!(
+            block.contains(krate),
+            "{krate} is declared portable but is missing from the Makefile's \
+             PORTABLE list, so `make cross-check` would not build it for the \
+             reMarkable.\n\nPORTABLE currently reads:\n{block}"
+        );
+    }
+}
+
+/// The justfile mirrors the Makefile, so it has to carry the same list.
+#[test]
+fn the_justfile_mirrors_the_cross_compile_list() {
+    let justfile = fs::read_to_string(workspace_root().join("justfile")).expect("read justfile");
+    let line = justfile
+        .lines()
+        .find(|l| l.starts_with("PORTABLE"))
+        .expect("justfile defines PORTABLE");
+
+    for krate in PORTABLE_CRATES {
+        if CROSS_CHECK_EXEMPT.iter().any(|(name, _)| name == krate) {
+            continue;
+        }
+        assert!(
+            line.contains(krate),
+            "{krate} is missing from the justfile's PORTABLE list. The two task \
+             runners must agree, or `just check` and `make check` verify \
+             different things."
+        );
+    }
+}

@@ -15,7 +15,8 @@ SHELL := /usr/bin/env bash
 RM_TARGET := armv7-unknown-linux-gnueabihf
 RM_HOST   ?= 10.11.99.1
 PORTABLE  := -p marginalia-core -p marginalia-safety -p marginalia-observability \
-             -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero
+             -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero \
+             -p marginalia-library-folder
 # Not $TMPDIR: on macOS that lives under /var, which the agent refuses to write
 # to. The refusal is correct -- /var belongs to the device -- so the dev home
 # goes somewhere unambiguously ours instead.
