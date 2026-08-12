@@ -578,9 +578,11 @@ dependencies = [
  "chrono",
  "marginalia-core",
  "marginalia-database",
+ "marginalia-platform",
  "marginalia-remarkable",
  "marginalia-safety",
  "marginalia-simulator",
+ "marginalia-zotero",
 ]
 
 [[package]]

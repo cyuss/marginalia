@@ -101,10 +101,13 @@ Zotero  ──sync──►  reMarkFlow agent  ──generates──►  "Librar
   is the stated product philosophy.
 - ➕ Failure mode is benign: the agent dies, the user keeps reading.
 - ➕ Lowest resource cost — no rendering, no input handling, no refresh policy.
-- ➖ **Interaction is the hard problem.** "Download this specific PDF" needs a
-  way for the user to express a choice with no UI. Candidate mechanisms — a
-  generated document with a convention, a native tag the agent polls, a
-  companion tap — all need design and a spike. This is the option's real cost.
+- ➕ **The interaction problem is now solved.** It was this option's real cost.
+  [ADR-006](./ADR-006-on-device-interaction.md) proposes the *request form*: the
+  agent generates an index with a tick box beside each entry, the user marks one
+  with the stylus, and the agent reads the annotation layer on its next wake.
+  That needs only annotation *reading* — the GREEN capability Phase 5 requires
+  anyway. The derivation is implemented and tested in
+  `marginalia_core::request_form`.
 - ➖ Latency: a generated index refreshes on a cycle, not on a tap.
 - ➖ It is a different product from the one the roadmap describes.
 
@@ -112,8 +115,9 @@ Zotero  ──sync──►  reMarkFlow agent  ──generates──►  "Librar
 
 **None yet.** This ADR is deliberately unresolved.
 
-My recommendation, offered as input rather than a decision: **pursue D as the
-V1 shape, with a hardware spike to establish whether B is achievable.** D is
+My recommendation, strengthened since ADR-006: **pursue D as the V1 shape**,
+with a hardware spike to establish whether B is achievable. D's one hole is
+closed, so it is now a complete product shape rather than a partial one. D is
 the only option that does not require relaxing a safety invariant, and the
 invariants were written first and for good reason. If the interaction problem
 in D proves unsolvable, the choice becomes an explicit, documented trade — "we
@@ -135,7 +139,9 @@ Until this is decided:
 
 1. A documented read-only hardware probe: how a non-`xochitl` process can
    obtain display access on the target firmware, if at all.
-2. For option D: a design spike on the interaction mechanism, with at least one
-   working end-to-end path for "user selects one attachment → it downloads".
+2. ~~For option D: a design spike on the interaction mechanism.~~ **Done** —
+   [ADR-006](./ADR-006-on-device-interaction.md), with the mark→intent→grant
+   path exercised end to end in
+   `tests/safety/tests/standalone_device.rs::the_device_can_complete_the_essential_workflow_alone`.
 3. Confirmation from the project lead of which invariants, if any, may be
    relaxed — recorded here, in writing, with the reasoning.

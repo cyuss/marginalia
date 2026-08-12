@@ -12,4 +12,6 @@ marginalia-safety.workspace = true
 marginalia-remarkable.workspace = true
 marginalia-database.workspace = true
 marginalia-simulator.workspace = true
+marginalia-platform.workspace = true
+marginalia-zotero.workspace = true
 chrono.workspace = true

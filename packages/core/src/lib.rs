@@ -17,6 +17,7 @@ pub mod document;
 pub mod error;
 pub mod ids;
 pub mod intent;
+pub mod request_form;
 pub mod secret;
 pub mod sync;
 pub mod tag;
@@ -27,6 +28,7 @@ pub use clock::{Clock, FixedClock, SteppingClock, SystemClock, SYSTEM_CLOCK};
 pub use credentials::{CredentialError, CredentialKey, CredentialStore};
 pub use error::{CoreError, IllegalTransition};
 pub use ids::*;
+pub use request_form::{FormAction, FormRequest, MarkVerdict, RequestForm};
 pub use secret::Redacted;
 
 /// Timestamps are UTC everywhere. Local time is a presentation concern.
