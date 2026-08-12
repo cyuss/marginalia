@@ -4,7 +4,7 @@
 //! mappings, sync jobs and the safety log. The Zotero and annotation
 //! repositories arrive with the phases that need them.
 
-use chrono::Utc;
+use marginalia_core::clock::{Clock, SYSTEM_CLOCK};
 use marginalia_core::document::{Document, DocumentSource, DocumentState};
 use marginalia_core::ids::{DocumentId, RemarkableDocumentId};
 use marginalia_core::sync::{JobTrigger, SyncJobKind};
@@ -53,11 +53,21 @@ fn source_str(source: DocumentSource) -> &'static str {
 
 pub struct DocumentRepository<'a> {
     conn: &'a Connection,
+    clock: &'a dyn Clock,
 }
 
 impl<'a> DocumentRepository<'a> {
     pub fn new(conn: &'a Connection) -> Self {
-        Self { conn }
+        Self {
+            conn,
+            clock: &SYSTEM_CLOCK,
+        }
+    }
+
+    /// As [`Self::new`], with an explicit clock. Device tests use this to make
+    /// timestamps deterministic and to reproduce a clock that jumps.
+    pub fn with_clock(conn: &'a Connection, clock: &'a dyn Clock) -> Self {
+        Self { conn, clock }
     }
 
     pub fn insert(&self, doc: &Document) -> DbResult<()> {
@@ -92,7 +102,7 @@ impl<'a> DocumentRepository<'a> {
     pub fn set_state(&self, id: &DocumentId, state: DocumentState) -> DbResult<()> {
         self.conn.execute(
             "UPDATE document SET state = ?2, updated_at = ?3 WHERE id = ?1",
-            params![id.as_str(), state_str(state), Utc::now().to_rfc3339()],
+            params![id.as_str(), state_str(state), self.clock.now().to_rfc3339()],
         )?;
         Ok(())
     }
@@ -125,11 +135,19 @@ impl<'a> MappingRepository<'a> {
 
 pub struct SyncJobRepository<'a> {
     conn: &'a Connection,
+    clock: &'a dyn Clock,
 }
 
 impl<'a> SyncJobRepository<'a> {
     pub fn new(conn: &'a Connection) -> Self {
-        Self { conn }
+        Self {
+            conn,
+            clock: &SYSTEM_CLOCK,
+        }
+    }
+
+    pub fn with_clock(conn: &'a Connection, clock: &'a dyn Clock) -> Self {
+        Self { conn, clock }
     }
 
     pub fn create(&self, id: &str, kind: SyncJobKind, trigger: JobTrigger) -> DbResult<()> {
@@ -150,7 +168,7 @@ impl<'a> SyncJobRepository<'a> {
         self.conn.execute(
             "INSERT INTO sync_job (id, kind, state, triggered_by, started_at)
              VALUES (?1, ?2, 'CREATED', ?3, ?4)",
-            params![id, kind_str, trigger_str, Utc::now().to_rfc3339()],
+            params![id, kind_str, trigger_str, self.clock.now().to_rfc3339()],
         )?;
         Ok(())
     }
@@ -160,6 +178,7 @@ impl<'a> SyncJobRepository<'a> {
 mod tests {
     use super::*;
     use crate::open_in_memory;
+    use chrono::{TimeZone, Utc};
     use marginalia_core::ids::MappingId;
 
     fn sample_document() -> Document {
@@ -279,6 +298,62 @@ mod tests {
             err.is_err(),
             "only a user may start a transfer; a schedule must be refused"
         );
+    }
+
+    #[test]
+    fn timestamps_come_from_the_injected_clock() {
+        // Proof the port is load-bearing rather than decorative: with a frozen
+        // clock, the row carries that exact instant. A device test can now
+        // assert on timestamps without sleeping, and can reproduce a clock that
+        // has jumped after a week asleep.
+        let conn = open_in_memory().unwrap();
+        let frozen = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
+        let clock = marginalia_core::clock::FixedClock::at(frozen);
+
+        let doc = sample_document();
+        DocumentRepository::new(&conn).insert(&doc).unwrap();
+
+        DocumentRepository::with_clock(&conn, &clock)
+            .set_state(&doc.id, DocumentState::AttachmentAvailable)
+            .unwrap();
+
+        let updated: String = conn
+            .query_row(
+                "SELECT updated_at FROM document WHERE id = ?1",
+                params![doc.id.as_str()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(updated, frozen.to_rfc3339());
+    }
+
+    #[test]
+    fn a_clock_that_goes_backwards_is_recorded_faithfully() {
+        // The repository's job is to record what the clock said, not to
+        // second-guess it. Detecting skew is a higher layer's decision, and it
+        // needs the raw value to make it.
+        let conn = open_in_memory().unwrap();
+        let doc = sample_document();
+        DocumentRepository::new(&conn).insert(&doc).unwrap();
+
+        let later = Utc.timestamp_opt(2_000_000_000, 0).unwrap();
+        let earlier = Utc.timestamp_opt(1_000_000_000, 0).unwrap();
+
+        for instant in [later, earlier] {
+            let clock = marginalia_core::clock::FixedClock::at(instant);
+            DocumentRepository::with_clock(&conn, &clock)
+                .set_state(&doc.id, DocumentState::AttachmentAvailable)
+                .unwrap();
+        }
+
+        let updated: String = conn
+            .query_row(
+                "SELECT updated_at FROM document WHERE id = ?1",
+                params![doc.id.as_str()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(updated, earlier.to_rfc3339());
     }
 
     #[test]

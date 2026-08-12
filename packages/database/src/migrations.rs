@@ -4,6 +4,7 @@
 //! shipped app must not depend on files a user could move, and the schema a
 //! build expects should be part of that build.
 
+use marginalia_core::clock::{Clock, SYSTEM_CLOCK};
 use rusqlite::Connection;
 
 use crate::{DbError, DbResult};
@@ -47,6 +48,12 @@ pub fn current_version(conn: &Connection) -> DbResult<u32> {
 /// so a crash mid-migration leaves the database at the previous version rather
 /// than in a half-migrated state that nothing knows how to interpret.
 pub fn apply_all(conn: &Connection) -> DbResult<()> {
+    apply_all_with_clock(conn, &SYSTEM_CLOCK)
+}
+
+/// As [`apply_all`], with an explicit clock so a device test can pin the
+/// `applied_at` stamps and reproduce clock skew.
+pub fn apply_all_with_clock(conn: &Connection, clock: &dyn Clock) -> DbResult<()> {
     let current = current_version(conn)?;
     let latest = latest_version();
 
@@ -66,7 +73,7 @@ pub fn apply_all(conn: &Connection) -> DbResult<()> {
             conn.execute(
                 "INSERT INTO schema_migrations (version, name, applied_at)
                      VALUES (?1, ?2, ?3)",
-                rusqlite::params![m.version, m.name, chrono::Utc::now().to_rfc3339()],
+                rusqlite::params![m.version, m.name, clock.now().to_rfc3339()],
             )
             .map(|_| ())
         });

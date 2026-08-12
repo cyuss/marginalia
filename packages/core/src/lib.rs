@@ -10,6 +10,7 @@
 
 pub mod annotation;
 pub mod checksum;
+pub mod clock;
 pub mod device;
 pub mod document;
 pub mod error;
@@ -20,6 +21,7 @@ pub mod tag;
 pub mod zotero;
 
 pub use checksum::Checksum;
+pub use clock::{Clock, FixedClock, SteppingClock, SystemClock, SYSTEM_CLOCK};
 pub use error::{CoreError, IllegalTransition};
 pub use ids::*;
 
