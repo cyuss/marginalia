@@ -6,6 +6,7 @@ license.workspace = true
 description = "Structured logging with a dedicated, auditable SAFETY channel."
 
 [dependencies]
+marginalia-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true

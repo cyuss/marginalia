@@ -76,8 +76,14 @@ fn allowed_internal_deps() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     // The domain core depends on nothing. This is the load-bearing rule.
     m.insert("marginalia-core", BTreeSet::new());
 
-    // Logging is standalone so any target can use it.
-    m.insert("marginalia-observability", BTreeSet::new());
+    // Logging depends on the core for one thing only: `Redacted`, which moved
+    // into the domain when the credential port needed to name it. The edge
+    // points inward, so it is legal — and declaring it here is the deliberate
+    // act the test exists to force.
+    m.insert(
+        "marginalia-observability",
+        ["marginalia-core"].into_iter().collect(),
+    );
 
     m.insert(
         "marginalia-safety",

@@ -359,6 +359,7 @@ name = "marginalia-observability"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "marginalia-core",
  "serde",
  "serde_json",
  "tracing",

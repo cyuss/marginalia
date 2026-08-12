@@ -13,41 +13,16 @@
 //! including `Debug` — so a lazy `{:?}` on a struct containing one cannot leak
 //! it.
 
-use std::fmt;
-
 pub mod safety_log;
 
 pub use safety_log::{SafetyEvent, SafetyLogEntry, SafetyOutcome};
 
-/// A value that must never appear in output.
+/// Re-exported from the domain core.
 ///
-/// Wrap API keys, tokens, passwords and note contents in this at the boundary,
-/// and the compiler carries the guarantee for you.
-#[derive(Clone, PartialEq, Eq)]
-pub struct Redacted<T>(T);
-
-impl<T> Redacted<T> {
-    pub fn new(value: T) -> Self {
-        Self(value)
-    }
-
-    /// Deliberately verbose. Reading a secret should look unusual in a diff.
-    pub fn expose_secret(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T> fmt::Debug for Redacted<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<redacted>")
-    }
-}
-
-impl<T> fmt::Display for Redacted<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<redacted>")
-    }
-}
+/// It moved there because a secret is a domain concern and the credential port
+/// needs to name one, and the core cannot depend on this crate. The guarantee
+/// is unchanged: `<redacted>` in both `Display` and `Debug`.
+pub use marginalia_core::secret::Redacted;
 
 /// Initialise logging. Call once at startup.
 ///
@@ -74,34 +49,21 @@ mod tests {
 
     #[derive(Debug)]
     #[allow(dead_code)]
-    struct Config {
+    struct SyncConfig {
         endpoint: String,
         api_key: Redacted<String>,
     }
 
+    /// The redaction contract matters most at a logging call site, so this
+    /// crate keeps a test for it even though the type now lives in core.
     #[test]
-    fn a_secret_never_renders() {
-        let secret = Redacted::new("zotero-api-key-abc123".to_string());
-        assert_eq!(format!("{secret}"), "<redacted>");
-        assert_eq!(format!("{secret:?}"), "<redacted>");
-    }
-
-    #[test]
-    fn a_lazy_debug_on_the_whole_struct_still_redacts() {
-        // The realistic leak is `tracing::info!(?config)`, not a deliberate
-        // print of the secret itself.
-        let config = Config {
+    fn a_struct_logged_with_debug_does_not_leak_its_secret() {
+        let config = SyncConfig {
             endpoint: "https://api.zotero.org".into(),
             api_key: Redacted::new("zotero-api-key-abc123".into()),
         };
         let rendered = format!("{config:?}");
         assert!(rendered.contains("<redacted>"));
         assert!(!rendered.contains("abc123"));
-    }
-
-    #[test]
-    fn the_secret_is_still_reachable_when_genuinely_needed() {
-        let secret = Redacted::new("token".to_string());
-        assert_eq!(secret.expose_secret(), "token");
     }
 }
