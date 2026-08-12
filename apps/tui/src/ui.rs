@@ -232,3 +232,71 @@ mod tests {
         assert!(area.y + area.height <= screen.height);
     }
 }
+
+#[cfg(test)]
+mod render_tests {
+    use super::*;
+    use crate::app::App;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    fn screen(app: &App, width: u16, height: u16) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|frame| draw(frame, app)).unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn app() -> App {
+        App::new("10.11.99.1".to_string())
+    }
+
+    #[test]
+    fn the_first_screen_shows_the_device_and_the_first_actions() {
+        let rendered = screen(&app(), 100, 30);
+        assert!(rendered.contains("Marginalia"));
+        assert!(rendered.contains("10.11.99.1"));
+        assert!(rendered.contains("Check the device"));
+        assert!(rendered.contains("YOUR REMARKABLE"));
+    }
+
+    /// The command is shown before it is run. Someone should be able to see
+    /// what a menu entry does without trusting the label.
+    #[test]
+    fn the_command_that_will_run_is_visible() {
+        let rendered = screen(&app(), 100, 30);
+        assert!(rendered.contains("doctor.sh"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn the_confirmation_says_what_is_about_to_happen() {
+        let mut a = app();
+        a.selected = a
+            .entries()
+            .iter()
+            .position(|(_, act)| act.danger == Danger::Removes)
+            .unwrap();
+        a.activate();
+
+        let rendered = screen(&a, 100, 30);
+        assert!(rendered.contains("Are you sure"));
+        assert!(rendered.contains("removes things"));
+        assert!(rendered.contains("documents are never touched"));
+    }
+
+    /// A narrow terminal must not panic or draw outside its buffer.
+    #[test]
+    fn it_survives_a_very_small_terminal() {
+        for (w, h) in [(20, 6), (40, 10), (200, 60)] {
+            let rendered = screen(&app(), w, h);
+            assert_eq!(rendered.lines().count(), h as usize);
+        }
+    }
+}
