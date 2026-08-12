@@ -135,7 +135,24 @@ Blocked on [ADR-002](docs/adr/ADR-002-remarkable-ui-and-runtime.md) (U11).
 **Exit:** the app runs locally with Wi-Fi and desktop absent; owns and recovers
 its data; uninstalls cleanly; writes no native/system path.
 
-## Phase 2 — Direct Zotero metadata synchronization on RM2 ☐
+## Phase 2 — Direct Zotero metadata synchronization on RM2 ◐
+
+Progress so far, all portable and hardware-free:
+
+- ☑ credentials model — library ID, library kind, key, kept distinct
+- ☑ setup flow that verifies before storing, and never stores a rejected key
+- ☑ key-only setup: the library is discovered via `/keys/current`, not asked for
+- ☑ `HttpZoteroClient` behind the `http` feature (off by default; U16)
+- ☑ `SyncCursor` / `SyncPlanner`: incremental versions, pagination, deletions
+- ☑ watermark advances only after the last page commits, so an interrupted
+      sync re-runs a page rather than skipping it
+- ☑ `BackoffPolicy`: `Retry-After` wins, exponential with a ceiling otherwise,
+      and a permanent failure is never retried
+- ☑ `SyncTally` reporting `pdfs_transferred`, always zero for a metadata sync
+- ☐ wiring the planner to the database and the journal
+- ☐ collections and tags
+- ☐ the agent exposing `sync` and the Zotero setup command
+- ☐ TLS on the device (U16)
 
 The v1 desktop-side plan below is superseded in target but not in substance:
 the sync engine, firewall and journal are unchanged; the runtime moves to the

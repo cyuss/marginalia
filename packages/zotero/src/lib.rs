@@ -17,12 +17,14 @@
 
 pub mod credentials;
 pub mod setup;
+pub mod sync;
 
 #[cfg(feature = "http")]
 pub mod http;
 
 pub use credentials::{LibraryKind, LibraryRef, ZoteroCredentials};
 pub use setup::{SetupOutcome, SetupService};
+pub use sync::{BackoffPolicy, ItemPage, RemoteItem, SyncCursor, SyncPlanner, SyncTally};
 
 use thiserror::Error;
 
