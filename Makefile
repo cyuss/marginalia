@@ -16,7 +16,10 @@ RM_TARGET := armv7-unknown-linux-gnueabihf
 RM_HOST   ?= 10.11.99.1
 PORTABLE  := -p marginalia-core -p marginalia-safety -p marginalia-observability \
              -p marginalia-remarkable -p marginalia-platform -p marginalia-zotero
-AGENT_DEV_HOME := $(if $(TMPDIR),$(TMPDIR),/tmp)/marginalia-dev
+# Not $TMPDIR: on macOS that lives under /var, which the agent refuses to write
+# to. The refusal is correct -- /var belongs to the device -- so the dev home
+# goes somewhere unambiguously ours instead.
+AGENT_DEV_HOME := $(HOME)/.marginalia-dev
 
 # Every target that produces no file of its own.
 .PHONY: help setup setup-rust setup-node setup-cross \

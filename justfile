@@ -55,7 +55,10 @@ dev-web:
 
 # Run the on-device agent locally — `just agent doctor`.
 agent *ARGS="status":
-    MARGINALIA_HOME="${TMPDIR:-/tmp}/marginalia-dev" cargo run -q -p marginalia-agent -- {{ARGS}}
+    # Not $TMPDIR: on macOS that lives under /var, which the agent refuses to
+    # write to. The refusal is correct -- /var belongs to the device -- so the
+    # dev home goes somewhere unambiguously ours instead.
+    MARGINALIA_HOME="${HOME}/.marginalia-dev" cargo run -q -p marginalia-agent -- {{ARGS}}
 
 # Create the agent's local scratch home and database.
 agent-init:
