@@ -21,8 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Install the pinned toolchain
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          echo "rust-toolchain.toml pins $toolchain"
+          rustup toolchain install "$toolchain" --component rustfmt --component clippy
+          rustup default "$toolchain"
       - uses: Swatinem/rust-cache@v2
 
       - name: Format
@@ -49,19 +53,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: armv7-unknown-linux-gnueabihf
+      - name: Install the pinned toolchain
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          echo "rust-toolchain.toml pins $toolchain"
+          rustup toolchain install "$toolchain" --component rustfmt --component clippy
+          rustup default "$toolchain"
+      - name: Add the reMarkable target to that toolchain
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup target add armv7-unknown-linux-gnueabihf --toolchain "$toolchain"
+          rustup target list --installed --toolchain "$toolchain"
       - uses: Swatinem/rust-cache@v2
 
-      # marginalia-database is excluded: libsqlite3-sys builds SQLite from C and
-      # needs a cross toolchain. Tracked as U17; see ADR-003.
+      # Delegated to the Makefile so the crate list has one home. Duplicating it
+      # here is how CI ends up checking a different set from the one developers
+      # check locally.
       - name: Check portable crates for armv7
-        run: |
-          cargo check --target armv7-unknown-linux-gnueabihf \
-            -p marginalia-core \
-            -p marginalia-safety \
-            -p marginalia-observability \
-            -p marginalia-remarkable
+        run: make cross-check
 
   # Run separately and with output, so a failure here is impossible to miss in
   # the log. A pull request with a failing or skipped safety test does not merge.
@@ -71,6 +80,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install the pinned toolchain
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          echo "rust-toolchain.toml pins $toolchain"
+          rustup toolchain install "$toolchain" --component rustfmt --component clippy
+          rustup default "$toolchain"
       - uses: Swatinem/rust-cache@v2
 
       - name: Safety suite
@@ -116,6 +131,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install the pinned toolchain
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          echo "rust-toolchain.toml pins $toolchain"
+          rustup toolchain install "$toolchain" --component rustfmt --component clippy
+          rustup default "$toolchain"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
