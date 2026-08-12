@@ -1,0 +1,11 @@
+[package]
+name = "marginalia-platform"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Adapters that touch the host: credential stores, paths. Depends inward on core ports."
+
+[dependencies]
+marginalia-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

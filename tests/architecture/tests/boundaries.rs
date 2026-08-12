@@ -27,7 +27,21 @@ const PORTABLE_CRATES: &[&str] = &[
     "marginalia-observability",
     "marginalia-database",
     "marginalia-remarkable",
+    "marginalia-platform",
 ];
+
+/// Adapters: the layer whose *job* is to know about a host.
+///
+/// They must still cross-compile and must still avoid desktop-only
+/// dependencies, but `#[cfg(unix)]` is legitimate here — that is the whole
+/// point of an adapter. Everywhere else it is a platform assumption leaking
+/// into logic that should not have one.
+const ADAPTER_CRATES: &[&str] = &["marginalia-platform"];
+
+/// Crates where a platform branch is a defect: domain and application logic.
+fn is_platform_agnostic(name: &str) -> bool {
+    PORTABLE_CRATES.contains(&name) && !ADAPTER_CRATES.contains(&name)
+}
 
 /// External crates that must never appear in a portable crate's dependency
 /// list. Each is a proxy for a whole category of non-portability.
@@ -98,6 +112,11 @@ fn allowed_internal_deps() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         ["marginalia-core", "marginalia-safety"]
             .into_iter()
             .collect(),
+    );
+    // Host adapters implement core ports. The edge points inward, as required.
+    m.insert(
+        "marginalia-platform",
+        ["marginalia-core"].into_iter().collect(),
     );
 
     // Test-only crates may depend on anything they are testing.
@@ -328,9 +347,9 @@ fn the_domain_core_has_no_io_dependencies_at_all() {
 /// Guards the roadmap's rule that expensive or unavailable capabilities are
 /// selected through explicit interfaces, not scattered `cfg(target)` checks.
 #[test]
-fn portable_crates_do_not_branch_on_the_target_platform() {
+fn domain_and_application_crates_do_not_branch_on_the_target_platform() {
     for krate in read_manifests() {
-        if !PORTABLE_CRATES.contains(&krate.name.as_str()) {
+        if !is_platform_agnostic(&krate.name) {
             continue;
         }
         for file in rust_sources(&krate.dir) {
@@ -343,8 +362,9 @@ fn portable_crates_do_not_branch_on_the_target_platform() {
                 assert!(
                     !branches_on_os,
                     "{}:{} branches on the target platform.\n  {}\n\
-                     Platform differences belong behind a port, chosen once at \
-                     composition time, not sprinkled through domain logic.",
+                     Platform differences belong behind a port, implemented in \
+                     an adapter crate (see ADAPTER_CRATES), not sprinkled \
+                     through domain logic.",
                     file.display(),
                     line_no,
                     line.trim()

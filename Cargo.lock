@@ -367,6 +367,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "marginalia-platform"
+version = "0.1.0"
+dependencies = [
+ "marginalia-core",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "marginalia-remarkable"
 version = "0.1.0"
 dependencies = [
