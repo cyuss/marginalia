@@ -82,10 +82,10 @@ impl<'a> SetupService<'a> {
     /// find a number on a settings page mid-setup is a needless step when
     /// Zotero will simply tell us what the key is.
     ///
-    /// Stores the key only when the destination is unambiguous. If the key
-    /// reaches several libraries, nothing is written until the user chooses —
-    /// storing first and asking after would leave a configured key pointing at
-    /// a library the user did not pick.
+    /// The **key** is stored as soon as Zotero has verified it. The **library**
+    /// is stored only when it is unambiguous; if the key reaches several, the
+    /// caller is asked and `zotero use` records the answer. Those are separate
+    /// questions, and conflating them made the multi-library path unusable.
     pub fn connect_with_key(&self, api_key: String) -> SetupOutcome {
         let probe = ZoteroCredentials::new(
             Redacted::new(api_key.clone()),
@@ -112,6 +112,26 @@ impl<'a> SetupService<'a> {
         }
 
         if !description.has_exactly_one_library() {
+            // Store the key, but not a library choice.
+            //
+            // These are two different questions and only one of them is
+            // unanswered. Zotero has just verified the key, so keeping it is
+            // recording a fact; picking a library the user has not chosen would
+            // be inventing one.
+            //
+            // Storing neither — which this did until it was tried end to end —
+            // makes the multi-library path a dead end: `connect` saves nothing,
+            // `use` saves only the library, and `sync` then reports no library
+            // connected with no way forward except a key that reaches exactly
+            // one library.
+            if let Err(e) = self
+                .store
+                .store(CredentialKey::ZoteroApiKey, Redacted::new(api_key))
+            {
+                return SetupOutcome::Rejected {
+                    error: ZoteroError::Protocol(format!("could not store the key: {e}")),
+                };
+            }
             return SetupOutcome::ChooseLibrary {
                 username: description.username,
                 options: libraries,
@@ -475,10 +495,16 @@ mod tests {
         assert!(store.load(CredentialKey::ZoteroApiKey).unwrap().is_some());
     }
 
+    /// The key is kept; the library choice is not made.
+    ///
+    /// This asserted `store.is_empty()` until the flow was run against a real
+    /// account, where it turned out to be a dead end: with nothing stored,
+    /// `zotero use` records only the library and `sync` reports no library
+    /// connected, with no command that fixes it. Zotero has verified the key by
+    /// this point, so keeping it records a fact; the library is what remains
+    /// genuinely unanswered.
     #[test]
-    fn a_key_reaching_several_libraries_asks_before_storing() {
-        // Storing first and asking after would leave a configured key pointing
-        // at a library the user never chose.
+    fn a_key_reaching_several_libraries_is_kept_but_no_library_is_chosen() {
         let client = StubClient::describing(describing_key(Some(true), &["98765"], false));
         let store = InMemoryCredentialStore::new();
 
@@ -491,9 +517,10 @@ mod tests {
             }
             other => panic!("expected ChooseLibrary, got {other:?}"),
         }
+
         assert!(
-            store.is_empty(),
-            "nothing may be stored until the destination is unambiguous"
+            store.load(CredentialKey::ZoteroApiKey).unwrap().is_some(),
+            "the verified key must survive so `zotero use` can finish the setup"
         );
     }
 
