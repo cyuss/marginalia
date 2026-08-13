@@ -86,6 +86,8 @@ pub struct SyncReport {
     pub synced_to: Option<i64>,
     /// Set when the page ceiling stopped the run. Not an error.
     pub stopped_at_page_limit: bool,
+    /// Folders written to the database — not merely seen.
+    pub collections_stored: usize,
 }
 
 impl SyncReport {
@@ -93,7 +95,8 @@ impl SyncReport {
     /// especially — when it is zero.
     pub fn summary(&self) -> String {
         format!(
-            "{} items · {} attachments · {} deletions · {} PDFs transferred",
+            "{} folders · {} items · {} attachments · {} deletions · {} PDFs transferred",
+            self.collections_stored,
             self.tally.items_seen,
             self.tally.attachments_seen,
             self.tally.deletions,
@@ -118,6 +121,47 @@ impl<'a> SyncRunner<'a> {
     /// Never transfers a file. It cannot: the only thing it hands the database
     /// is a `MetadataOperation`, and that type has no variant that can express
     /// one.
+    /// Mirror the library's folders, then resolve their parents.
+    ///
+    /// Returns how many rows the database actually holds afterwards — not how
+    /// many were seen. A summary that counts what went past rather than what
+    /// was kept is how a sync reports success while storing nothing, which is
+    /// precisely what this one did before folders were carried.
+    fn sync_collections(
+        &self,
+        credentials: &ZoteroCredentials,
+        planner: &SyncPlanner,
+        applier: &MetadataApplier,
+    ) -> Result<usize, SyncError> {
+        let mut start = 0u32;
+        let mut links = Vec::new();
+
+        loop {
+            let page = self
+                .client
+                .fetch_collections(credentials, start, PAGE_SIZE)?;
+
+            // The planner owns the mapping, here as everywhere else.
+            applier.apply(&planner.plan_collections(&page).operations)?;
+
+            links.extend(
+                page.collections
+                    .iter()
+                    .map(|c| (c.key.clone(), c.parent_key.clone())),
+            );
+
+            match page.next_start {
+                Some(next) => start = next,
+                None => break,
+            }
+        }
+
+        // Second pass: every folder now exists, so a parent can be resolved
+        // whatever page it arrived on.
+        applier.link_collection_parents(&links)?;
+        Ok(links.len())
+    }
+
     pub fn run(
         &self,
         credentials: &ZoteroCredentials,
@@ -138,6 +182,10 @@ impl<'a> SyncRunner<'a> {
             last_version: state.version_for(&library_key)?,
         };
 
+        // Folders first. They are few, they are cheap, and a tree that arrives
+        // before the items it contains is still useful; the reverse is not.
+        let collections_stored = self.sync_collections(credentials, &planner, &applier)?;
+
         match self.pump(&cursor, credentials, &planner, &applier, &journal, &job) {
             Ok((tally, reached_end, library_version, hit_limit)) => {
                 // The cursor moves here and nowhere else, after every page of
@@ -154,6 +202,7 @@ impl<'a> SyncRunner<'a> {
                     completed: reached_end,
                     synced_to,
                     stopped_at_page_limit: hit_limit,
+                    collections_stored,
                 };
 
                 journal.finish(
@@ -269,6 +318,21 @@ mod tests {
     }
 
     impl ZoteroClient for ScriptedClient {
+        fn fetch_collections(
+            &self,
+            _c: &ZoteroCredentials,
+            _start: u32,
+            _limit: u32,
+        ) -> Result<marginalia_zotero::sync::CollectionPage, ZoteroError> {
+            // No folders in these fixtures: they exercise item paging and the
+            // cursor, and inventing a tree here would test the stub.
+            Ok(marginalia_zotero::sync::CollectionPage {
+                collections: Vec::new(),
+                library_version: 0,
+                next_start: None,
+            })
+        }
+
         fn verify(&self, _c: &ZoteroCredentials) -> Result<KeyVerification, ZoteroError> {
             unreachable!("sync does not verify")
         }

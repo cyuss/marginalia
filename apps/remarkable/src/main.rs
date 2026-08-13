@@ -126,8 +126,9 @@ fn main() -> ExitCode {
                 }
             },
             Some("disconnect") => zotero_cmd::disconnect(&home),
+            Some("tree") => zotero_cmd::tree(&home),
             _ => {
-                eprintln!("usage: marginalia zotero <connect|use|disconnect>");
+                eprintln!("usage: marginalia zotero <connect|use|disconnect|tree>");
                 ExitCode::from(64)
             }
         },
@@ -186,6 +187,7 @@ COMMANDS
     zotero connect <api-key>    connect a library; the ID is discovered for you
     zotero use <id> [--group]   pick a library, when the key reaches several
     zotero disconnect           forget the key here (does NOT revoke it at Zotero)
+    zotero tree                 the folders, as stored on this device
     sync                        bring the metadata up to date
 
   Syncing brings titles, authors, collections, tags and which attachments

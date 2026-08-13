@@ -208,6 +208,53 @@ pub fn use_library(home: &Path, id: &str, group: bool) -> ExitCode {
     }
 }
 
+/// `marginalia zotero tree` — the folders, as stored on this device.
+///
+/// Reads the database and nothing else: no network, no library. If it is empty
+/// it says so, rather than printing a hopeful blank.
+pub fn tree(home: &Path) -> ExitCode {
+    let db_path = home.join("marginalia.sqlite");
+    let conn = match marginalia_database::open_with_profile(
+        &db_path.to_string_lossy(),
+        marginalia_database::StorageProfile::Device,
+    ) {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("could not open the database: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let applier = marginalia_database::sync_apply::MetadataApplier::new(&conn);
+    let folders = match applier.collection_tree() {
+        Ok(folders) => folders,
+        Err(e) => {
+            eprintln!("could not read the folders: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if folders.is_empty() {
+        println!("No folders stored yet.");
+        println!();
+        println!("  marginalia sync    fetch them from Zotero");
+        return ExitCode::SUCCESS;
+    }
+
+    println!("{} folder(s)\n", folders.len());
+    for folder in &folders {
+        let indent = "   ".repeat(folder.depth);
+        let branch = if folder.depth > 0 { "└─ " } else { "" };
+        let subfolders = if folder.children > 0 {
+            format!("   [{} subfolders]", folder.children)
+        } else {
+            String::new()
+        };
+        println!("{indent}{branch}{}{subfolders}", folder.name);
+    }
+    ExitCode::SUCCESS
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

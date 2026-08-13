@@ -271,6 +271,17 @@ mod tests {
     }
 
     impl ZoteroClient for StubClient {
+        fn fetch_collections(
+            &self,
+            _c: &ZoteroCredentials,
+            _start: u32,
+            _limit: u32,
+        ) -> Result<crate::sync::CollectionPage, ZoteroError> {
+            // Setup never asks for folders; a stub that returned some would be
+            // asserting something this module does not do.
+            unreachable!("setup does not fetch collections")
+        }
+
         fn verify(&self, _c: &ZoteroCredentials) -> Result<KeyVerification, ZoteroError> {
             *self.calls.borrow_mut() += 1;
             self.response

@@ -15,7 +15,7 @@
 use marginalia_core::secret::Redacted;
 
 use crate::credentials::ZoteroCredentials;
-use crate::sync::{ItemPage, RemoteItem, SyncCursor};
+use crate::sync::{CollectionPage, ItemPage, RemoteCollection, RemoteItem, SyncCursor};
 use crate::{KeyDescription, KeyVerification, LibraryAccess, ZoteroClient, ZoteroError};
 
 const API_BASE: &str = "https://api.zotero.org";
@@ -225,6 +225,71 @@ impl ZoteroClient for HttpZoteroClient {
             Err(ureq::Error::Transport(t)) => Err(map_transport(&t)),
         }
     }
+
+    fn fetch_collections(
+        &self,
+        credentials: &ZoteroCredentials,
+        start: u32,
+        limit: u32,
+    ) -> Result<CollectionPage, ZoteroError> {
+        // Always a full listing, never `since`. A folder tree is only useful
+        // whole: an incremental page can rename a child whose parent it does
+        // not carry, and a partial tree is worse than a slightly stale one.
+        // There are tens of these, not thousands.
+        // `base_path()` already begins with a slash — adding another produced
+        // `//users/…`, which Zotero answers with a 404 that reads like a wrong
+        // library ID.
+        let url = format!(
+            "{}{}/collections?start={start}&limit={limit}",
+            self.base_url,
+            credentials.library().base_path()
+        );
+
+        let response = self
+            .agent()
+            .get(&url)
+            .set("Zotero-API-Version", API_VERSION)
+            .set(
+                "Authorization",
+                &format!("Bearer {}", credentials.api_key().expose_secret()),
+            )
+            .call();
+
+        match response {
+            Ok(res) => {
+                let library_version = res
+                    .header("Last-Modified-Version")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
+                let next_start = next_start_from_link(res.header("Link"));
+                let body: serde_json::Value = res
+                    .into_json()
+                    .map_err(|_| ZoteroError::Protocol("collection page was not JSON".into()))?;
+                let array = body.as_array().ok_or_else(|| {
+                    ZoteroError::Protocol("collection page was not a list".into())
+                })?;
+
+                Ok(CollectionPage {
+                    collections: array.iter().filter_map(parse_collection).collect(),
+                    library_version,
+                    next_start,
+                })
+            }
+            Err(ureq::Error::Status(code, res)) => Err(match code {
+                401 => ZoteroError::Unauthorized,
+                403 => ZoteroError::Forbidden,
+                404 => ZoteroError::LibraryNotFound,
+                429 | 503 => ZoteroError::RateLimited {
+                    retry_after_secs: res
+                        .header("Retry-After")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(60),
+                },
+                other => ZoteroError::Protocol(format!("status {other}")),
+            }),
+            Err(ureq::Error::Transport(t)) => Err(map_transport(&t)),
+        }
+    }
 }
 
 /// Extract the `start` offset of the `rel="next"` link, if there is one.
@@ -289,6 +354,35 @@ fn parse_item(value: &serde_json::Value) -> Option<RemoteItem> {
         // wrong "PDF available" in front of the user.
         availability: marginalia_core::zotero::AttachmentAvailability::Unknown,
         tags,
+    })
+}
+
+/// Turn one collection's JSON into the folder we keep.
+///
+/// Zotero writes `"parentCollection": false` for a top-level folder rather than
+/// `null`, so a plain `Option` deserialise would silently make every root
+/// collection a child of nothing-in-particular. The `false` is checked for.
+fn parse_collection(value: &serde_json::Value) -> Option<RemoteCollection> {
+    let data = value.get("data")?;
+    let key = data.get("key").and_then(|v| v.as_str())?;
+    let name = data
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+
+    let parent = match data.get("parentCollection") {
+        Some(serde_json::Value::String(k)) if !k.is_empty() => {
+            Some(marginalia_core::ids::ZoteroKey::from_string(k.as_str()))
+        }
+        // `false`, `null`, or absent: this is a root folder.
+        _ => None,
+    };
+
+    Some(RemoteCollection {
+        key: marginalia_core::ids::ZoteroKey::from_string(key),
+        version: data.get("version").and_then(|v| v.as_i64()).unwrap_or(0),
+        name: name.to_string(),
+        parent_key: parent,
     })
 }
 

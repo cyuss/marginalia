@@ -56,6 +56,15 @@ fn availability_str(a: AttachmentAvailability) -> &'static str {
 }
 
 /// Applies metadata operations. Holds no state of its own.
+/// One folder, ready to print.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredCollection {
+    pub key: String,
+    pub name: String,
+    pub depth: usize,
+    pub children: usize,
+}
+
 pub struct MetadataApplier<'a> {
     conn: &'a Connection,
     clock: &'a dyn Clock,
@@ -103,6 +112,102 @@ impl<'a> MetadataApplier<'a> {
                 Err(e)
             }
         }
+    }
+
+    /// Resolve every collection's parent, once they all exist.
+    ///
+    /// Runs after the upserts so that page order cannot matter. A parent key
+    /// naming a collection we have never seen leaves the child at the top
+    /// level rather than failing: an unreachable parent is a stale reference,
+    /// not a reason to lose the folder.
+    pub fn link_collection_parents(
+        &self,
+        links: &[(
+            marginalia_core::ids::ZoteroKey,
+            Option<marginalia_core::ids::ZoteroKey>,
+        )],
+    ) -> DbResult<usize> {
+        let mut linked = 0usize;
+        for (child, parent) in links {
+            let changed = match parent {
+                Some(parent) => self.conn.execute(
+                    "UPDATE zotero_collection
+                        SET parent_collection_id =
+                              (SELECT id FROM zotero_collection WHERE zotero_key = ?2)
+                      WHERE zotero_key = ?1",
+                    params![child.as_str(), parent.as_str()],
+                )?,
+                None => self.conn.execute(
+                    "UPDATE zotero_collection SET parent_collection_id = NULL
+                      WHERE zotero_key = ?1",
+                    params![child.as_str()],
+                )?,
+            };
+            linked += changed;
+        }
+        Ok(linked)
+    }
+
+    /// The folder tree, as stored, in reading order.
+    ///
+    /// Depth is computed here rather than by the caller so that a cycle — which
+    /// Zotero should never produce, but a corrupt row could — cannot become an
+    /// infinite loop in a renderer.
+    pub fn collection_tree(&self) -> DbResult<Vec<StoredCollection>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.zotero_key, c.name, p.zotero_key
+               FROM zotero_collection c
+               LEFT JOIN zotero_collection p ON p.id = c.parent_collection_id
+              ORDER BY LOWER(c.name)",
+        )?;
+        let rows: Vec<(String, String, Option<String>)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<Result<_, _>>()?;
+
+        let mut children: std::collections::BTreeMap<Option<String>, Vec<(String, String)>> =
+            std::collections::BTreeMap::new();
+        for (key, name, parent) in &rows {
+            children
+                .entry(parent.clone())
+                .or_default()
+                .push((key.clone(), name.clone()));
+        }
+
+        fn walk(
+            children: &std::collections::BTreeMap<Option<String>, Vec<(String, String)>>,
+            parent: Option<String>,
+            depth: usize,
+            seen: &mut std::collections::HashSet<String>,
+            out: &mut Vec<StoredCollection>,
+        ) {
+            let Some(kids) = children.get(&parent) else {
+                return;
+            };
+            for (key, name) in kids {
+                // A cycle should be impossible, but a corrupt parent link must
+                // not become an infinite descent in a renderer.
+                if !seen.insert(key.clone()) {
+                    continue;
+                }
+                out.push(StoredCollection {
+                    key: key.clone(),
+                    name: name.clone(),
+                    depth,
+                    children: children.get(&Some(key.clone())).map_or(0, Vec::len),
+                });
+                walk(children, Some(key.clone()), depth + 1, seen, out);
+            }
+        }
+
+        let mut out = Vec::new();
+        walk(
+            &children,
+            None,
+            0,
+            &mut std::collections::HashSet::new(),
+            &mut out,
+        );
+        Ok(out)
     }
 
     fn apply_one(
@@ -173,20 +278,28 @@ impl<'a> MetadataApplier<'a> {
                 counts.tags_upserted += 1;
             }
 
-            MetadataOperation::UpsertZoteroCollection { key } => {
-                // Name and parent arrive with the full payload pass; what this
-                // establishes is that the collection exists and can be
-                // referred to. The parent is deliberately not resolved here —
-                // it may be on a later page, and guessing would reparent a
-                // user's collection.
+            MetadataOperation::UpsertZoteroCollection {
+                key, name, version, ..
+            } => {
+                // The parent is set in a second pass, by `link_collection_parents`.
+                //
+                // WHY not here: `parent_collection_id` is a foreign key onto
+                // this table's own `id`, and a child can arrive on an earlier
+                // page than its parent. Resolving inline would fail for exactly
+                // the collections that have a parent, which is most of them.
+                // Two passes make page order irrelevant.
                 self.conn.execute(
                     "INSERT INTO zotero_collection
                        (id, zotero_key, zotero_version, name, library_id)
-                     VALUES (?1, ?2, 0, '', '')
-                     ON CONFLICT(zotero_key) DO NOTHING",
+                     VALUES (?1, ?2, ?4, ?3, '')
+                     ON CONFLICT(zotero_key) DO UPDATE SET
+                        name = excluded.name,
+                        zotero_version = excluded.zotero_version",
                     params![
                         marginalia_core::ids::ZoteroItemId::new().as_str(),
-                        key.as_str()
+                        key.as_str(),
+                        name,
+                        version
                     ],
                 )?;
                 counts.collections_upserted += 1;
@@ -354,7 +467,12 @@ mod tests {
     fn collections_are_upserted_idempotently() {
         let conn = open_in_memory().unwrap();
         let applier = MetadataApplier::new(&conn);
-        let ops = [MetadataOperation::UpsertZoteroCollection { key: key("COLL1") }];
+        let ops = [MetadataOperation::UpsertZoteroCollection {
+            key: key("COLL1"),
+            name: "Machine Learning".into(),
+            parent_key: None,
+            version: 7,
+        }];
 
         applier.apply(&ops).unwrap();
         applier.apply(&ops).unwrap();
@@ -549,5 +667,128 @@ mod tests {
             )
             .unwrap();
         assert_eq!(at, frozen.to_rfc3339());
+    }
+
+    #[cfg(test)]
+    mod collection_tree_tests {
+        use super::*;
+        use marginalia_core::ids::ZoteroKey;
+
+        fn upsert(key: &str, name: &str, parent: Option<&str>) -> MetadataOperation {
+            MetadataOperation::UpsertZoteroCollection {
+                key: ZoteroKey::from_string(key),
+                name: name.into(),
+                parent_key: parent.map(ZoteroKey::from_string),
+                version: 1,
+            }
+        }
+
+        /// The property the two-pass design exists for: a child may arrive on an
+        /// earlier page than its parent, and the tree must come out the same.
+        #[test]
+        fn a_child_seen_before_its_parent_still_lands_under_it() {
+            let conn = crate::open_in_memory().unwrap();
+            let applier = MetadataApplier::new(&conn);
+
+            applier
+                .apply(&[
+                    upsert("CHILD", "Active Learning", Some("PARENT")),
+                    upsert("PARENT", "Machine Learning", None),
+                ])
+                .unwrap();
+            applier
+                .link_collection_parents(&[
+                    (
+                        ZoteroKey::from_string("CHILD"),
+                        Some(ZoteroKey::from_string("PARENT")),
+                    ),
+                    (ZoteroKey::from_string("PARENT"), None),
+                ])
+                .unwrap();
+
+            let tree = applier.collection_tree().unwrap();
+            assert_eq!(
+                tree.iter()
+                    .map(|c| (c.name.as_str(), c.depth))
+                    .collect::<Vec<_>>(),
+                [("Machine Learning", 0), ("Active Learning", 1)]
+            );
+            assert_eq!(tree[0].children, 1);
+        }
+
+        /// Two folders may share a name under different parents — this library has
+        /// two called "General Knowledge". Identity is the Zotero key, never the
+        /// name, or 259 references silently merge into one folder.
+        #[test]
+        fn folders_sharing_a_name_stay_separate() {
+            let conn = crate::open_in_memory().unwrap();
+            let applier = MetadataApplier::new(&conn);
+
+            applier
+                .apply(&[
+                    upsert("ML", "Machine Learning", None),
+                    upsert("MATHS", "Mathematics & CS", None),
+                    upsert("GK1", "General Knowledge", Some("ML")),
+                    upsert("GK2", "General Knowledge", Some("MATHS")),
+                ])
+                .unwrap();
+            applier
+                .link_collection_parents(&[
+                    (
+                        ZoteroKey::from_string("GK1"),
+                        Some(ZoteroKey::from_string("ML")),
+                    ),
+                    (
+                        ZoteroKey::from_string("GK2"),
+                        Some(ZoteroKey::from_string("MATHS")),
+                    ),
+                ])
+                .unwrap();
+
+            let tree = applier.collection_tree().unwrap();
+            assert_eq!(tree.len(), 4, "a shared name must not collapse two folders");
+            assert_eq!(
+                tree.iter()
+                    .filter(|c| c.name == "General Knowledge")
+                    .count(),
+                2
+            );
+        }
+
+        /// A parent Zotero no longer reports leaves the folder at the top level.
+        /// Losing the folder would be worse than showing it unnested.
+        #[test]
+        fn an_unknown_parent_leaves_the_folder_at_the_top_rather_than_dropping_it() {
+            let conn = crate::open_in_memory().unwrap();
+            let applier = MetadataApplier::new(&conn);
+
+            applier
+                .apply(&[upsert("ORPHAN", "Divers", Some("GONE"))])
+                .unwrap();
+            applier
+                .link_collection_parents(&[(
+                    ZoteroKey::from_string("ORPHAN"),
+                    Some(ZoteroKey::from_string("GONE")),
+                )])
+                .unwrap();
+
+            let tree = applier.collection_tree().unwrap();
+            assert_eq!(tree.len(), 1);
+            assert_eq!(tree[0].depth, 0);
+        }
+
+        /// Re-syncing must update names, not fork rows.
+        #[test]
+        fn a_renamed_folder_updates_in_place() {
+            let conn = crate::open_in_memory().unwrap();
+            let applier = MetadataApplier::new(&conn);
+
+            applier.apply(&[upsert("K", "Old name", None)]).unwrap();
+            applier.apply(&[upsert("K", "New name", None)]).unwrap();
+
+            let tree = applier.collection_tree().unwrap();
+            assert_eq!(tree.len(), 1);
+            assert_eq!(tree[0].name, "New name");
+        }
     }
 }

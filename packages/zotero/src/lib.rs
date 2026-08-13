@@ -184,6 +184,18 @@ pub trait ZoteroClient {
         start: u32,
         limit: u32,
     ) -> Result<sync::ItemPage, ZoteroError>;
+
+    /// Fetch one page of collections — the library's folders.
+    ///
+    /// Separate from [`Self::fetch_items`] because Zotero serves them from a
+    /// different endpoint, and because a folder tree is worth having even when
+    /// the item payload is still catching up.
+    fn fetch_collections(
+        &self,
+        credentials: &ZoteroCredentials,
+        start: u32,
+        limit: u32,
+    ) -> Result<sync::CollectionPage, ZoteroError>;
 }
 
 #[cfg(test)]

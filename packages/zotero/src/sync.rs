@@ -190,7 +190,12 @@ impl SyncPlanner {
         let ops = page
             .collections
             .iter()
-            .map(|c| MetadataOperation::UpsertZoteroCollection { key: c.key.clone() })
+            .map(|c| MetadataOperation::UpsertZoteroCollection {
+                key: c.key.clone(),
+                name: c.name.clone(),
+                parent_key: c.parent_key.clone(),
+                version: c.version,
+            })
             .collect();
 
         SyncPlan::new(SyncJobKind::ZoteroMetadata, ops)

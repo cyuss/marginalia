@@ -119,6 +119,12 @@ pub enum MetadataOperation {
     },
     UpsertZoteroCollection {
         key: ZoteroKey,
+        name: String,
+        /// The parent's Zotero key. `None` is a top-level folder — and it means
+        /// exactly that, rather than "not known yet", because the collections
+        /// endpoint always reports the parent alongside the child.
+        parent_key: Option<ZoteroKey>,
+        version: i64,
     },
     /// Record *that* an attachment exists and is readable. Records a fact;
     /// moves nothing.
