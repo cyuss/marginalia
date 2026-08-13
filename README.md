@@ -9,7 +9,7 @@
 Know what you are reading. Find what you highlighted. Keep your reMarkable
 exactly as it is.
 
-[Why](#why) · [How it works](#how-it-works) · [Install](docs/INSTALL.md) ·
+[Why](#why) · [How it works](#how-it-works) · [**Guide**](docs/GUIDE.md) · [Install](docs/INSTALL.md) ·
 [Architecture](docs/architecture/ARCHITECTURE.md) ·
 [Safety model](docs/safety/SAFETY_MODEL.md) · [Roadmap](ROADMAP.md)
 
